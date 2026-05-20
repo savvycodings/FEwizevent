@@ -15,6 +15,7 @@ import {
   Login,
   Menu,
   News,
+  NewsPostScreen,
   Play,
   RankingLeaderboard,
   PlayerInfo,
@@ -33,13 +34,39 @@ import { SPACING, TYPOGRAPHY } from './constants/layout'
 
 const Tab = createBottomTabNavigator()
 const Stack = createNativeStackNavigator()
+const NewsStack = createNativeStackNavigator()
+
+function NewsFlow() {
+  return (
+    <NewsStack.Navigator screenOptions={{ headerShown: true }}>
+      <NewsStack.Screen
+        name="NewsList"
+        component={News}
+        options={{
+          header: ({ navigation }) => (
+            <TopHeader showBack onBack={() => navigation.goBack()} />
+          ),
+        }}
+      />
+      <NewsStack.Screen
+        name="NewsPost"
+        component={NewsPostScreen}
+        options={{
+          header: ({ navigation }) => (
+            <TopHeader showBack onBack={() => navigation.goBack()} />
+          ),
+        }}
+      />
+    </NewsStack.Navigator>
+  )
+}
 
 function TopHeader({
   title,
   showBack = false,
   onBack,
 }: {
-  title: string
+  title?: string
   showBack?: boolean
   onBack?: () => void
 }) {
@@ -54,7 +81,7 @@ function TopHeader({
           </TouchableOpacity>
         ) : null}
       </View>
-      <Text style={styles.title}>{title}</Text>
+      {title ? <Text style={styles.title}>{title}</Text> : <View style={styles.titleSpacer} />}
       <View style={styles.side}>
         <Ionicons name="apps-outline" size={20} color={theme.backgroundColor} />
       </View>
@@ -110,12 +137,9 @@ function Tabs() {
       />
       <Tab.Screen
         name="News"
-        component={News}
+        component={NewsFlow}
         options={{
-          headerShown: true,
-          header: ({ navigation }) => (
-            <TopHeader title="News" showBack onBack={() => navigation.goBack()} />
-          ),
+          headerShown: false,
           tabBarButton: () => null,
           tabBarItemStyle: { display: 'none' },
         }}
@@ -356,8 +380,13 @@ const getHeaderStyles = (theme: any) =>
       alignItems: 'center',
     },
     title: {
+      flex: 1,
+      textAlign: 'center',
       color: theme.backgroundColor,
       fontFamily: theme.boldFont,
       fontSize: TYPOGRAPHY.h4,
+    },
+    titleSpacer: {
+      flex: 1,
     },
   })

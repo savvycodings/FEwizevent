@@ -68,7 +68,6 @@ export function AdminEventAttendance({ navigation }: { navigation: any }) {
       setSavingJudge(true)
       await apiRequest(`/admin/events/${eventId}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           scheduledRounds: n,
           useMatchTracking,

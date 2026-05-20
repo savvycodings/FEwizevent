@@ -9,6 +9,7 @@ import { IMAGE_MODELS, MODELS } from './constants'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { ChatModelModal } from './src/components/index'
 import { Model, User } from './types'
+import { clearAdminPass, hydrateAdminPass } from './src/adminSession'
 import { ActionSheetProvider } from '@expo/react-native-action-sheet'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import {
@@ -62,6 +63,7 @@ export default function App() {
       if (_imageModel) setImageModel(_imageModel)
       const _currentUser = await AsyncStorage.getItem('rnai-currentUser')
       if (_currentUser) setCurrentUser(JSON.parse(_currentUser))
+      await hydrateAdminPass()
     } catch (err) {
       console.log('error configuring storage', err)
     }
@@ -103,6 +105,7 @@ export default function App() {
       AsyncStorage.setItem('rnai-currentUser', JSON.stringify(user))
     } else {
       AsyncStorage.removeItem('rnai-currentUser')
+      clearAdminPass()
     }
   }
 

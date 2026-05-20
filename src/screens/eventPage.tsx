@@ -242,7 +242,11 @@ export function EventPage() {
           {error ? <Text style={styles.errorText}>{error}</Text> : null}
         </Section>
 
-        <Section title="Leaderboard" subtitle="Placements, match record, last loss." compactTopSpacing>
+        <Section
+          title="Leaderboard"
+          subtitle="Everyone marked attended; placement shows when set."
+          compactTopSpacing
+        >
           {loading ? (
             <ThemedCard style={styles.emptyCard}>
               <Text style={styles.emptyText}>Loading leaderboard...</Text>
@@ -303,7 +307,11 @@ export function EventPage() {
             </Surface>
           ) : (
             <ThemedCard style={styles.emptyCard}>
-              <Text style={styles.emptyText}>No leaderboard placements yet.</Text>
+              <Text style={styles.emptyText}>
+                {stats.attendeeCount > 0
+                  ? 'No attendees to show.'
+                  : 'Mark players as attended to appear on the leaderboard.'}
+              </Text>
             </ThemedCard>
           )}
         </Section>

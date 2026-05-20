@@ -36,7 +36,8 @@
           "photosPermission": "Allow access to your photos to attach images.",
           "cameraPermission": false
         }
-      ]
+      ],
+      "@react-native-community/datetimepicker"
     ],
     "extra": {
       "eas": {

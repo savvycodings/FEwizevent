@@ -14,10 +14,18 @@ import { BlurView } from 'expo-blur'
 import Ionicons from '@expo/vector-icons/Ionicons'
 import { useNavigation, useRoute } from '@react-navigation/native'
 import { ThemeContext } from '../context'
-import { ThemedButton, ThemedCard } from '../components'
+import { EventDateField, ThemedButton, ThemedCard } from '../components'
 import { RADIUS, SPACING, TYPOGRAPHY } from '../constants/layout'
 import { apiRequest } from '../api'
 import { DOMAIN } from '../../constants'
+import { getAdminPassHeaders } from '../adminSession'
+import {
+  canPlacementDown,
+  canPlacementUp,
+  getTakenPlacements,
+  nextPlacementDown,
+  nextPlacementUp,
+} from '../utils/placementUtils'
 
 type User = { id: number; name: string; email: string }
 type Event = {
@@ -127,22 +135,32 @@ export function Admin() {
     await load()
   }
 
-  const PLACEMENT_MAX = 99
-
   async function bumpPlacement(userId: number, eventId: number, delta: -1 | 1) {
     const key = `${userId}:${eventId}`
     const raw = placementMap[key]
     const cur = raw == null || raw < 1 ? null : raw
+    const eventRows = attendance
+      .filter((row) => row.eventId === eventId)
+      .map((row) => ({
+        userId: row.userId,
+        placement: placementMap[`${row.userId}:${eventId}`] ?? null,
+      }))
+    const taken = getTakenPlacements(eventRows, userId)
+    const next = delta === -1 ? nextPlacementDown(cur, taken) : nextPlacementUp(cur, taken)
 
-    let next: number | null
-    if (delta === -1) {
-      if (cur == null) return
-      next = cur <= 1 ? null : cur - 1
-    } else {
-      if (cur == null) next = 1
-      else if (cur >= PLACEMENT_MAX) return
-      else next = cur + 1
+    if (delta === -1 && cur != null && next === null) {
+      try {
+        await apiRequest('/admin/attendance-placement', {
+          method: 'POST',
+          body: JSON.stringify({ userId, eventId, placement: null }),
+        })
+        await load()
+      } catch (err: any) {
+        Alert.alert('Placement failed', err?.message || 'Try again')
+      }
+      return
     }
+    if (next == null && delta === 1) return
 
     try {
       await apiRequest('/admin/attendance-placement', {
@@ -174,6 +192,7 @@ export function Admin() {
 
       const uploadResponse = await fetch(`${DOMAIN}/admin/upload-event-banner`, {
         method: 'POST',
+        headers: getAdminPassHeaders(),
         body: formData,
       })
       const uploadData = await uploadResponse.json()
@@ -244,12 +263,11 @@ export function Admin() {
               placeholder="Event title"
               placeholderTextColor={theme.mutedForegroundColor}
             />
-            <TextInput
+            <EventDateField
               value={eventDate}
-              onChangeText={setEventDate}
-              style={styles.input}
-              placeholder="Event date (YYYY-MM-DD)"
-              placeholderTextColor={theme.mutedForegroundColor}
+              onChange={setEventDate}
+              label="Event date (optional)"
+              optional
             />
             <TextInput
               value={location}
@@ -351,8 +369,15 @@ export function Admin() {
                     const place = placementMap[key]
                     const placeNum = place == null || place < 1 ? null : place
                     const placeLabel = placeNum == null ? '—' : ordinalPlacement(placeNum)
-                    const canDecrement = placeNum != null
-                    const canIncrement = placeNum == null || placeNum < PLACEMENT_MAX
+                    const eventRows = attendance
+                      .filter((row) => row.eventId === eventId)
+                      .map((row) => ({
+                        userId: row.userId,
+                        placement: placementMap[`${row.userId}:${eventId}`] ?? null,
+                      }))
+                    const taken = getTakenPlacements(eventRows, user.id)
+                    const canDecrement = canPlacementDown(placeNum, taken)
+                    const canIncrement = canPlacementUp(placeNum, taken)
                     return (
                       <View key={user.id} style={styles.userRow}>
                         <View style={styles.userIdentity}>

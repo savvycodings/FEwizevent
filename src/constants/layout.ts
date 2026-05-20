@@ -14,6 +14,9 @@ export const SPACING = {
   headerPadding: 12,
 } as const
 
+/** Matches tab bar height in main.tsx — use for ScrollView bottom inset on tab screens. */
+export const TAB_BAR_HEIGHT = 64
+
 export const RADIUS = {
   sm: 6,
   md: 10,

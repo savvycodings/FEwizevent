@@ -48,7 +48,6 @@ export function Play() {
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
       <View style={styles.hero}>
         <Text style={styles.heroTitle}>Play!</Text>
-        <Text style={styles.heroSubtitle}>Championship points, tiers, and your recent events.</Text>
       </View>
 
       <View style={styles.surface}>
@@ -62,45 +61,43 @@ export function Play() {
         </View>
         <Divider faint spacing="md" />
 
-        <Section
-          title="Championship points"
-          subtitle="Totals are illustrative until synced with live events."
-          compactTopSpacing
-        >
+        <Section title="Championship points" compactTopSpacing>
           <ThemedCard premiumRim>
-            <CardCaption caption="Per format — TCG, VGC, and GO.">
-              <View style={styles.pointsRow}>
-                {championshipPoints.map((item, index) => (
-                  <View
-                    key={item.id}
-                    style={[styles.pointsCell, index > 0 ? styles.pointsCellWithRule : null]}
-                  >
-                    <Text style={styles.pointsLabel}>{item.label}</Text>
-                    <Text style={styles.pointsValue}>{item.points}</Text>
-                  </View>
-                ))}
-              </View>
-            </CardCaption>
+            <View style={styles.threeColRow}>
+              {championshipPoints.map((item, index) => (
+                <View
+                  key={item.id}
+                  style={[styles.threeColCell, index > 0 ? styles.threeColCellWithRule : null]}
+                >
+                  <Text style={styles.colLabel} numberOfLines={2}>
+                    {item.label}
+                  </Text>
+                  <Text style={styles.colValue}>{item.points}</Text>
+                </View>
+              ))}
+            </View>
           </ThemedCard>
         </Section>
 
-        <Section
-          title="Championship tiers"
-          subtitle="Breakdown by tournament level — Worlds, Internationals, and Regionals."
-          compactTopSpacing
-        >
-          <View style={styles.bucketRow}>
-            {eventBuckets.map((item, bi) => (
-              <ThemedCard key={item.id} premiumRim={bi === 0} style={styles.bucketCard}>
-                <CardCaption caption={item.label}>
-                  <Text style={styles.bucketCount}>{item.count}</Text>
-                </CardCaption>
-              </ThemedCard>
-            ))}
-          </View>
+        <Section title="Championship tiers" compactTopSpacing>
+          <ThemedCard premiumRim>
+            <View style={styles.threeColRow}>
+              {eventBuckets.map((item, index) => (
+                <View
+                  key={item.id}
+                  style={[styles.threeColCell, index > 0 ? styles.threeColCellWithRule : null]}
+                >
+                  <Text style={styles.colLabel} numberOfLines={2}>
+                    {item.label}
+                  </Text>
+                  <Text style={styles.colValue}>{item.count}</Text>
+                </View>
+              ))}
+            </View>
+          </ThemedCard>
         </Section>
 
-        <Section title="Recent events" subtitle="From your attendance history." compactTopSpacing>
+        <Section title="Recent events" compactTopSpacing>
           {recentEvents.length > 0 ? (
             recentEvents.map((item, ri) => (
               <ThemedCard
@@ -114,11 +111,7 @@ export function Play() {
               </ThemedCard>
             ))
           ) : (
-            <EmptyState
-              variant="mutedBand"
-              title="No history yet"
-              message="When an admin marks you attended for an event, it will show up here."
-            />
+            <EmptyState variant="mutedBand" title="No history yet" message="No attended events yet." />
           )}
         </Section>
       </View>
@@ -146,14 +139,6 @@ const getStyles = (theme: any) =>
       fontFamily: theme.boldFont,
       fontSize: TYPOGRAPHY.h2,
     },
-    heroSubtitle: {
-      marginTop: SPACING.sm,
-      color: theme.backgroundColor,
-      fontFamily: theme.regularFont,
-      fontSize: TYPOGRAPHY.bodySmall,
-      opacity: 0.92,
-      lineHeight: TYPOGRAPHY.bodySmall * 1.4,
-    },
     surface: {
       marginTop: -SPACING['2xl'],
       borderTopLeftRadius: RADIUS.xl,
@@ -178,50 +163,38 @@ const getStyles = (theme: any) =>
       fontSize: TYPOGRAPHY.bodySmall,
       lineHeight: TYPOGRAPHY.bodySmall * 1.4,
     },
-    pointsRow: {
+    threeColRow: {
       flexDirection: 'row',
       alignItems: 'stretch',
+      width: '100%',
     },
-    pointsCell: {
+    threeColCell: {
       flex: 1,
+      flexBasis: 0,
+      minWidth: 0,
       alignItems: 'flex-start',
+      justifyContent: 'flex-start',
       gap: SPACING.sm,
-      paddingRight: SPACING.md,
+      paddingRight: SPACING.sm,
     },
-    pointsCellWithRule: {
+    threeColCellWithRule: {
       borderLeftWidth: StyleSheet.hairlineWidth * 2,
       borderLeftColor: theme.dividerColor ?? theme.borderColor,
-      paddingLeft: SPACING.md,
-      marginLeft: 0,
+      paddingLeft: SPACING.sm,
     },
-    pointsLabel: {
+    colLabel: {
       color: theme.mutedForegroundColor,
       fontFamily: theme.mediumFont,
-      fontSize: TYPOGRAPHY.bodySmall,
+      fontSize: TYPOGRAPHY.caption,
+      lineHeight: Math.round(TYPOGRAPHY.caption * 1.35),
       textAlign: 'left',
+      width: '100%',
     },
-    pointsValue: {
+    colValue: {
       color: theme.textColor,
       fontFamily: theme.boldFont,
       fontSize: TYPOGRAPHY.h4,
       textAlign: 'left',
-    },
-    bucketRow: {
-      flexDirection: 'row',
-      gap: SPACING.md,
-    },
-    bucketCard: {
-      flex: 1,
-      minHeight: 108,
-      justifyContent: 'flex-start',
-      alignItems: 'stretch',
-    },
-    bucketCount: {
-      color: theme.textColor,
-      fontFamily: theme.boldFont,
-      fontSize: TYPOGRAPHY.h2,
-      textAlign: 'left',
-      lineHeight: TYPOGRAPHY.h2 * 1.1,
     },
     playEventCard: {
       marginBottom: SPACING.md,

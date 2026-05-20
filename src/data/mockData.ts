@@ -22,27 +22,6 @@ export const badges = [
   },
 ]
 
-export const news = [
-  {
-    id: 'rules-q1',
-    title: 'Play! Pokemon Rules and Resources Updated for Q1 2026',
-    date: 'Tuesday, April 07, 2026',
-    tag: 'New',
-  },
-  {
-    id: 'interest-list',
-    title: 'Register for the PokemonXP and 2026 Worlds Multi-Day Interest List',
-    date: 'Thursday, April 02, 2026',
-    tag: 'New',
-  },
-  {
-    id: 'transition',
-    title: 'Play! Pokemon Competitions Transition to Pokemon Champions',
-    date: 'Monday, March 23, 2026',
-    tag: 'New',
-  },
-]
-
 export const upcomingEvents = [
   {
     id: 'la-regional',
@@ -65,9 +44,9 @@ export const championshipPoints = [
 ]
 
 export const eventBuckets = [
-  { id: 'worlds', label: 'World Championships', count: 0 },
-  { id: 'internationals', label: 'International Championships', count: 0 },
-  { id: 'regionals', label: 'Regional Championships', count: 0 },
+  { id: 'worlds', label: 'Worlds', count: 0 },
+  { id: 'internationals', label: 'Internationals', count: 0 },
+  { id: 'regionals', label: 'Regionals', count: 0 },
 ]
 
 export const playEvents = [

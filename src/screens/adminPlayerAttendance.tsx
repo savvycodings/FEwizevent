@@ -6,6 +6,7 @@ import { ThemeContext } from '../context'
 import { ThemedButton, ThemedCard } from '../components'
 import { RADIUS, SPACING, TYPOGRAPHY } from '../constants/layout'
 import { apiRequest } from '../api'
+import { BADGE_AWARD_TEXT, BADGE_DISPLAY_TITLE, type BadgeId } from '../data/badgesCatalog'
 import {
   type EventMatch,
   focalOutcome,
@@ -17,6 +18,14 @@ import {
   replaceFocalRoundMatches,
   suggestOpponentFromPreviousRound,
 } from '../utils/matchUtils'
+import {
+  canPlacementDown,
+  canPlacementUp,
+  getTakenPlacements,
+  nextPlacementDown,
+  nextPlacementUp,
+  PLACEMENT_MAX,
+} from '../utils/placementUtils'
 
 type User = {
   id: number
@@ -27,17 +36,6 @@ type User = {
 }
 type EventDetails = { id: number; title: string; eventDate: string | null; location: string | null }
 type Attendance = { userId: number; eventId: number; attended: boolean; placement?: number | null }
-type BadgeId =
-  | 'placed1st'
-  | 'placed2nd'
-  | 'placed3rd'
-  | 'champion'
-  | 'magician'
-  | 'sweat'
-  | 'scholar'
-  | 'quick'
-  | 'scientist'
-  | 'flawless'
 type EarnedBadge = {
   badgeId: BadgeId
   placement: number | null
@@ -53,19 +51,16 @@ type PlacementBoardRow = {
   placement: number | null
 }
 
-const PLACEMENT_MAX = 99
-const BADGES_TO_AWARD: Array<{
-  id: Exclude<BadgeId, 'placed1st' | 'placed2nd' | 'placed3rd'>
-  label: string
-  icon: any
-}> = [
-  { id: 'champion', label: 'Champion', icon: require('../../assets/badges/champion.png') },
-  { id: 'magician', label: 'Magician', icon: require('../../assets/badges/magician.png') },
-  { id: 'sweat', label: 'Sweat', icon: require('../../assets/badges/sweat.png') },
-  { id: 'scholar', label: 'Scholar', icon: require('../../assets/badges/scholar.png') },
-  { id: 'quick', label: 'Quick', icon: require('../../assets/badges/quick.png') },
-  { id: 'scientist', label: 'Scientist', icon: require('../../assets/badges/scientist.png') },
-  { id: 'flawless', label: 'Flawless', icon: require('../../assets/badges/flawless.png') },
+type ManualBadgeId = Exclude<BadgeId, 'placed1st' | 'placed2nd' | 'placed3rd'>
+
+const BADGES_TO_AWARD: Array<{ id: ManualBadgeId; icon: number }> = [
+  { id: 'champion', icon: require('../../assets/badges/champion.png') },
+  { id: 'magician', icon: require('../../assets/badges/magician.png') },
+  { id: 'sweat', icon: require('../../assets/badges/sweat.png') },
+  { id: 'scholar', icon: require('../../assets/badges/scholar.png') },
+  { id: 'quick', icon: require('../../assets/badges/quick.png') },
+  { id: 'scientist', icon: require('../../assets/badges/scientist.png') },
+  { id: 'flawless', icon: require('../../assets/badges/flawless.png') },
 ]
 
 function ordinalPlacement(n: number): string {
@@ -120,6 +115,12 @@ export function AdminPlayerAttendance() {
   const placeNum =
     current?.placement == null || Number(current.placement) < 1 ? null : Number(current.placement)
   const placeLabel = placeNum == null ? '—' : ordinalPlacement(placeNum)
+  const takenPlacements = useMemo(
+    () => getTakenPlacements(placementBoard, userId),
+    [placementBoard, userId]
+  )
+  const canPlaceUp = canPlacementUp(placeNum, takenPlacements)
+  const canPlaceDown = canPlacementDown(placeNum, takenPlacements)
   const duplicatePlacements = useMemo(() => {
     const counts = new Map<number, number>()
     for (const row of placementBoard) {
@@ -198,25 +199,22 @@ export function AdminPlayerAttendance() {
   async function bumpPlacement(delta: -1 | 1) {
     if (!eventId || !userId) return
     const cur = placeNum
-    let next: number | null
-    if (delta === -1) {
-      if (cur == null) return
-      next = cur <= 1 ? null : cur - 1
-    } else {
-      if (cur == null) next = 1
-      else if (cur >= PLACEMENT_MAX) return
-      else next = cur + 1
-    }
-    if (next != null) {
-      const holder = placementBoard.find((r) => r.userId !== userId && r.placement === next)
-      if (holder) {
-        Alert.alert(
-          'Place already taken',
-          `${holder.userName} already has ${ordinalPlacement(next)}. Change their placement first or pick another rank.`
-        )
-        return
+    const taken = getTakenPlacements(placementBoard, userId)
+    const next = delta === -1 ? nextPlacementDown(cur, taken) : nextPlacementUp(cur, taken)
+    if (delta === -1 && cur != null && next === null) {
+      // Below current rank is all taken — clear placement
+      try {
+        await apiRequest('/admin/attendance-placement', {
+          method: 'POST',
+          body: JSON.stringify({ userId, eventId, placement: null }),
+        })
+        await load()
+      } catch (err: any) {
+        Alert.alert('Placement failed', err?.message || 'Try again')
       }
+      return
     }
+    if (next == null && delta === 1) return
     try {
       await apiRequest('/admin/attendance-placement', {
         method: 'POST',
@@ -544,35 +542,33 @@ export function AdminPlayerAttendance() {
           <View style={styles.placementStepper}>
             <Pressable
               onPress={() => bumpPlacement(-1)}
-              disabled={placeNum == null}
+              disabled={!canPlaceDown}
               style={({ pressed }) => [
                 styles.placementStepperBtn,
-                placeNum == null && styles.placementStepperBtnDimmed,
-                pressed && placeNum != null && styles.placementStepperBtnPressed,
+                !canPlaceDown && styles.placementStepperBtnDimmed,
+                pressed && canPlaceDown && styles.placementStepperBtnPressed,
               ]}
             >
               <Ionicons
                 name="remove-outline"
                 size={22}
-                color={placeNum == null ? theme.mutedForegroundColor : theme.textColor}
+                color={!canPlaceDown ? theme.mutedForegroundColor : theme.textColor}
               />
             </Pressable>
             <Text style={styles.placementStepperLabel}>{placeLabel}</Text>
             <Pressable
               onPress={() => bumpPlacement(1)}
-              disabled={placeNum != null && placeNum >= PLACEMENT_MAX}
+              disabled={!canPlaceUp}
               style={({ pressed }) => [
                 styles.placementStepperBtn,
-                placeNum != null && placeNum >= PLACEMENT_MAX && styles.placementStepperBtnDimmed,
-                pressed &&
-                  (placeNum == null || placeNum < PLACEMENT_MAX) &&
-                  styles.placementStepperBtnPressed,
+                !canPlaceUp && styles.placementStepperBtnDimmed,
+                pressed && canPlaceUp && styles.placementStepperBtnPressed,
               ]}
             >
               <Ionicons
                 name="add-outline"
                 size={22}
-                color={placeNum != null && placeNum >= PLACEMENT_MAX ? theme.mutedForegroundColor : theme.textColor}
+                color={!canPlaceUp ? theme.mutedForegroundColor : theme.textColor}
               />
             </Pressable>
           </View>
@@ -582,6 +578,8 @@ export function AdminPlayerAttendance() {
           <View style={styles.badgeGrid}>
             {BADGES_TO_AWARD.map((badge) => {
               const alreadyAwarded = earnedBadges.some((b) => b.badgeId === badge.id)
+              const title = BADGE_DISPLAY_TITLE[badge.id]
+              const description = BADGE_AWARD_TEXT[badge.id]
               return (
                 <Pressable
                   key={badge.id}
@@ -592,7 +590,18 @@ export function AdminPlayerAttendance() {
                     pressed && styles.badgeOptionPressed,
                   ]}
                 >
-                  <Image source={badge.icon} style={styles.badgeOptionImage} resizeMode="contain" />
+                  <View style={styles.badgeImageWrap}>
+                    <Image source={badge.icon} style={styles.badgeOptionImage} resizeMode="contain" />
+                  </View>
+                  <Text style={styles.badgeOptionTitle} numberOfLines={1}>
+                    {title}
+                  </Text>
+                  <Text style={styles.badgeOptionDesc} numberOfLines={2}>
+                    {description}
+                  </Text>
+                  {alreadyAwarded ? (
+                    <Text style={styles.badgeAwardedLabel}>Awarded</Text>
+                  ) : null}
                 </Pressable>
               )
             })}
@@ -960,29 +969,64 @@ const getStyles = (theme: any) =>
     badgeGrid: {
       flexDirection: 'row',
       flexWrap: 'wrap',
-      gap: SPACING.sm,
+      gap: SPACING.md,
+      justifyContent: 'space-between',
     },
     badgeOption: {
-      width: '31%',
+      width: '48%',
       borderWidth: 1,
       borderColor: theme.borderColor,
       borderRadius: RADIUS.lg,
       backgroundColor: theme.cardBackground,
-      minHeight: 128,
-      paddingVertical: SPACING.md,
+      minHeight: 168,
+      paddingHorizontal: SPACING.sm,
+      paddingTop: SPACING.md,
+      paddingBottom: SPACING.md,
       alignItems: 'center',
-      justifyContent: 'center',
     },
     badgeOptionAwarded: {
       borderColor: theme.tintColor,
+      backgroundColor: theme.surfaceMuted ?? theme.cardBackground,
     },
     badgeOptionPressed: {
-      opacity: 0.8,
+      opacity: 0.85,
+    },
+    badgeImageWrap: {
+      width: 72,
+      height: 72,
+      alignItems: 'center',
+      justifyContent: 'center',
+      overflow: 'hidden',
+      marginBottom: SPACING.xs,
     },
     badgeOptionImage: {
-      width: 68,
-      height: 68,
-      transform: [{ scale: 2.15 }, { translateY: 8 }],
+      width: 56,
+      height: 56,
+      transform: [{ scale: 1.85 }, { translateY: 6 }],
+    },
+    badgeOptionTitle: {
+      color: theme.textColor,
+      fontFamily: theme.semiBoldFont,
+      fontSize: TYPOGRAPHY.bodySmall,
+      textAlign: 'center',
+      width: '100%',
+    },
+    badgeOptionDesc: {
+      marginTop: 2,
+      color: theme.mutedForegroundColor,
+      fontFamily: theme.regularFont,
+      fontSize: TYPOGRAPHY.caption,
+      lineHeight: Math.round(TYPOGRAPHY.caption * 1.35),
+      textAlign: 'center',
+      width: '100%',
+      paddingHorizontal: 2,
+    },
+    badgeAwardedLabel: {
+      marginTop: SPACING.xs,
+      color: theme.tintColor,
+      fontFamily: theme.mediumFont,
+      fontSize: TYPOGRAPHY.caption,
+      textAlign: 'center',
     },
     emptyWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.backgroundColor },
     emptyText: { color: theme.mutedForegroundColor, fontFamily: theme.mediumFont, fontSize: TYPOGRAPHY.body },
