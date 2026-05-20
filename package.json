@@ -1,5 +1,5 @@
 {
-  "name": "Wiz XP",
+  "name": "wiz-xp",
   "version": "1.1.0",
   "packageManager": "pnpm@9.15.9",
   "main": "index.js",
@@ -62,11 +62,6 @@
       "reactNativeDirectoryCheck": {
         "enabled": false
       }
-    }
-  },
-  "pnpm": {
-    "overrides": {
-      "react-native-worklets": "0.5.1"
     }
   }
 }
