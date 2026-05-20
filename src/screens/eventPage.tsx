@@ -244,7 +244,6 @@ export function EventPage() {
 
         <Section
           title="Leaderboard"
-          subtitle="Everyone marked attended; placement shows when set."
           compactTopSpacing
         >
           {loading ? (

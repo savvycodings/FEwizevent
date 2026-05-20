@@ -17,6 +17,10 @@
     },
     "production": {
       "autoIncrement": true,
+      "node": "22.14.0",
+      "android": {
+        "resourceClass": "medium"
+      },
       "env": {
         "EXPO_PUBLIC_ENV": "PRODUCTION",
         "EXPO_PUBLIC_PROD_API_URL": "https://bewizevent-production.up.railway.app"

@@ -1,0 +1,6 @@
+# Never upload secrets or local keys to EAS
+wizardevent-*.json
+wonderport-*.json
+*-credentials.json
+.env
+.env.*
