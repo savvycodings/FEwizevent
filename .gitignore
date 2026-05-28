@@ -34,6 +34,7 @@ yarn-error.*
 
 # GCP / Firebase service account keys (never commit)
 wizardevent-*.json
+wonderport-*.json
 *-credentials.json
 
 # typescript
