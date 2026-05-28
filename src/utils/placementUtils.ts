@@ -14,34 +14,25 @@ export function getTakenPlacements(
   return taken
 }
 
-/** Next rank when pressing + (skips ranks another player already has). */
-export function nextPlacementUp(
-  current: number | null,
-  taken: Set<number>
-): number | null {
-  const start = current == null ? 1 : current + 1
-  for (let p = start; p <= PLACEMENT_MAX; p++) {
-    if (!taken.has(p)) return p
-  }
-  return null
-}
-
-/** Next rank when pressing − (skips taken ranks; clears if none below). */
-export function nextPlacementDown(
-  current: number | null,
-  taken: Set<number>
-): number | null {
+/** − button: better rank (1st is best). Shifts others on the server when the slot is taken. */
+export function nextPlacementDown(current: number | null): number | null {
   if (current == null) return null
-  for (let p = current - 1; p >= 1; p--) {
-    if (!taken.has(p)) return p
-  }
-  return null
+  if (current <= 1) return null
+  return current - 1
 }
 
-export function canPlacementUp(current: number | null, taken: Set<number>): boolean {
-  return nextPlacementUp(current, taken) != null
+/** + button: worse rank (higher number). Shifts others on the server when the slot is taken. */
+export function nextPlacementUp(current: number | null): number | null {
+  if (current == null) return 1
+  if (current >= PLACEMENT_MAX) return null
+  return current + 1
 }
 
-export function canPlacementDown(current: number | null, _taken: Set<number>): boolean {
+export function canPlacementDown(current: number | null): boolean {
   return current != null
+}
+
+export function canPlacementUp(current: number | null): boolean {
+  if (current == null) return true
+  return current < PLACEMENT_MAX
 }

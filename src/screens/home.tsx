@@ -32,6 +32,7 @@ interface HomeProps {
 
 type HomeFeedItem = {
   id: number
+  eventId: number
   eventTitle: string
   markedAt: string
   placement?: number | null
@@ -99,7 +100,19 @@ export function Home({ navigation }: HomeProps) {
   const { width: screenWidth } = useWindowDimensions()
   const badgeCellWidth = screenWidth / 3
   const styles = getStyles(theme)
-  const goToNews = () => navigation.navigate('News')
+  const openAttendedEvents = useCallback(() => {
+    navigation.navigate('AttendedEvents')
+  }, [navigation])
+  const openEventPage = useCallback(
+    (item: HomeFeedItem) => {
+      const eventId = Number(item.eventId)
+      if (!eventId || Number.isNaN(eventId)) return
+      navigation.navigate('EventPage', {
+        event: { id: eventId, title: item.eventTitle },
+      })
+    },
+    [navigation]
+  )
   const scrollBottomPadding = SPACING['4xl'] + insets.bottom
 
   const [weekStreak, setWeekStreak] = useState(0)
@@ -163,7 +176,6 @@ export function Home({ navigation }: HomeProps) {
       {
         id: 'streak',
         label: 'Week streak',
-        hint: 'Events this week',
         value: homeLoading ? '…' : String(weekStreak),
         icon: require('../../assets/badges/sweat.png'),
         accent: theme.tintColor,
@@ -171,7 +183,6 @@ export function Home({ navigation }: HomeProps) {
       {
         id: 'badges',
         label: 'Badges',
-        hint: 'Tournament honors',
         value: homeLoading ? '…' : String(earnedBadges.length),
         icon: BADGE_ASSET.champion,
         accent: theme.tintColor,
@@ -205,9 +216,20 @@ export function Home({ navigation }: HomeProps) {
             </View>
             <View style={styles.heroTextWrap}>
               <Text style={styles.heroGreeting}>Welcome back</Text>
-              <Text style={styles.heroName} numberOfLines={1}>
-                {displayName}
-              </Text>
+              <View style={styles.heroNameRow}>
+                <Text style={styles.heroName} numberOfLines={1}>
+                  {displayName}
+                </Text>
+                <Pressable
+                  onPress={() => navigation.navigate('PlayerSearch')}
+                  style={({ pressed }) => [styles.heroSearchBtn, pressed && styles.heroSearchBtnPressed]}
+                  accessibilityRole="button"
+                  accessibilityLabel="Search players"
+                  hitSlop={8}
+                >
+                  <Ionicons name="search-outline" size={30} color="#000" />
+                </Pressable>
+              </View>
               <View style={styles.rankPill}>
                 <Image source={RANK_BADGE[currentRank]} style={styles.rankPillIcon} resizeMode="contain" />
                 <Text style={styles.rankPillText}>
@@ -225,12 +247,9 @@ export function Home({ navigation }: HomeProps) {
           {overviewItems.map((item) => {
             const inner = (
               <View style={[styles.statCardInner, { borderColor: `${item.accent}55` }]}>
-                <View style={[styles.statIconBubble, { backgroundColor: `${item.accent}22` }]}>
-                  <Image source={item.icon} style={styles.statIconImage} resizeMode="contain" />
-                </View>
+                <Image source={item.icon} style={styles.statIconImage} resizeMode="contain" />
                 <Text style={styles.statValue}>{item.value}</Text>
                 <Text style={styles.statLabel}>{item.label}</Text>
-                <Text style={styles.statHint}>{item.hint}</Text>
               </View>
             )
             if (item.id === 'badges') {
@@ -265,9 +284,7 @@ export function Home({ navigation }: HomeProps) {
                     : `Champion maxed · ${currentXp} XP`}
                 </Text>
               </View>
-              <View style={styles.rankBadgeGlow}>
-                <Image source={RANK_BADGE[currentRank]} style={styles.rankBadgeImage} resizeMode="contain" />
-              </View>
+              <Image source={RANK_BADGE[currentRank]} style={styles.rankBadgeImage} resizeMode="contain" />
             </View>
             <View style={styles.rankProgressTrack}>
               <LinearGradient
@@ -309,7 +326,12 @@ export function Home({ navigation }: HomeProps) {
           )}
         </Section>
 
-        <Section title="Activity" subtitle="Recent events you attended." onPressSeeAll={goToNews} compactTopSpacing>
+        <Section
+          title="Activity"
+          subtitle="Recent events you attended."
+          onPressSeeAll={openAttendedEvents}
+          compactTopSpacing
+        >
           {!currentUser?.id ? (
             <View style={styles.feedEmptyCard}>
               <Ionicons name="person-outline" size={24} color={theme.mutedForegroundColor} />
@@ -327,13 +349,14 @@ export function Home({ navigation }: HomeProps) {
               {feed.map((item, feedIndex) => {
                 const place =
                   item.placement != null && Number(item.placement) >= 1 ? Number(item.placement) : null
-                const isLast = feedIndex === feed.length - 1
                 return (
-                  <View key={item.id} style={styles.feedItemRow}>
-                    <View style={styles.feedTimelineCol}>
-                      <View style={[styles.feedDot, feedIndex === 0 && styles.feedDotActive]} />
-                      {!isLast ? <View style={styles.feedLine} /> : null}
-                    </View>
+                  <Pressable
+                    key={item.id}
+                    onPress={() => openEventPage(item)}
+                    style={({ pressed }) => [styles.feedCardPressable, pressed && styles.feedCardPressed]}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Open ${item.eventTitle}`}
+                  >
                     <ThemedCard premiumRim={feedIndex === 0} style={styles.feedCard}>
                       <View style={styles.feedCardHeader}>
                         <View style={styles.feedIconBubble}>
@@ -349,7 +372,7 @@ export function Home({ navigation }: HomeProps) {
                         </View>
                       ) : null}
                     </ThemedCard>
-                  </View>
+                  </Pressable>
                 )
               })}
             </View>
@@ -421,6 +444,23 @@ const getStyles = (theme: any) =>
       flexDirection: 'row',
       alignItems: 'center',
       gap: SPACING.md,
+      minWidth: 0,
+    },
+    heroNameRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: SPACING.sm,
+      marginTop: 2,
+    },
+    heroSearchBtn: {
+      width: 40,
+      height: 40,
+      alignItems: 'center',
+      justifyContent: 'center',
+      flexShrink: 0,
+    },
+    heroSearchBtnPressed: {
+      opacity: 0.85,
     },
     heroGreeting: {
       color: 'rgba(0,0,0,0.65)',
@@ -458,11 +498,12 @@ const getStyles = (theme: any) =>
       fontSize: TYPOGRAPHY.h3,
     },
     heroName: {
+      flex: 1,
       color: '#000',
       fontFamily: theme.boldFont,
       fontSize: TYPOGRAPHY.h2,
-      marginTop: 2,
       letterSpacing: -0.3,
+      minWidth: 0,
     },
     rankPill: {
       flexDirection: 'row',
@@ -510,37 +551,27 @@ const getStyles = (theme: any) =>
       backgroundColor: theme.cardBackground,
       padding: SPACING.md,
       minHeight: 128,
-      justifyContent: 'flex-end',
-    },
-    statIconBubble: {
-      width: 40,
-      height: 40,
-      borderRadius: 20,
       alignItems: 'center',
       justifyContent: 'center',
-      marginBottom: SPACING.sm,
     },
     statIconImage: {
-      width: 24,
-      height: 24,
+      width: 32,
+      height: 32,
+      marginBottom: SPACING.sm,
     },
     statValue: {
       color: theme.textColor,
       fontFamily: theme.boldFont,
       fontSize: TYPOGRAPHY.h2,
       letterSpacing: -0.5,
+      textAlign: 'center',
     },
     statLabel: {
       color: theme.textColor,
       fontFamily: theme.semiBoldFont,
       fontSize: TYPOGRAPHY.bodySmall,
       marginTop: 2,
-    },
-    statHint: {
-      color: theme.mutedForegroundColor,
-      fontFamily: theme.regularFont,
-      fontSize: TYPOGRAPHY.caption,
-      marginTop: 2,
+      textAlign: 'center',
     },
     rankCard: {
       marginBottom: SPACING.md,
@@ -565,14 +596,6 @@ const getStyles = (theme: any) =>
       fontFamily: theme.regularFont,
       fontSize: TYPOGRAPHY.bodySmall,
       marginTop: SPACING.xs,
-    },
-    rankBadgeGlow: {
-      width: 52,
-      height: 52,
-      borderRadius: 26,
-      backgroundColor: 'rgba(143, 211, 255, 0.15)',
-      alignItems: 'center',
-      justifyContent: 'center',
     },
     rankBadgeImage: {
       width: 44,
@@ -630,41 +653,16 @@ const getStyles = (theme: any) =>
       paddingHorizontal: SPACING.md,
     },
     feedList: {
-      gap: 0,
-    },
-    feedItemRow: {
-      flexDirection: 'row',
       gap: SPACING.md,
     },
-    feedTimelineCol: {
-      width: 14,
-      alignItems: 'center',
-      paddingTop: SPACING.lg,
+    feedCardPressable: {
+      width: '100%',
     },
-    feedDot: {
-      width: 10,
-      height: 10,
-      borderRadius: 5,
-      backgroundColor: theme.borderColor,
-      borderWidth: 2,
-      borderColor: theme.backgroundColor,
-    },
-    feedDotActive: {
-      backgroundColor: theme.tintColor,
-      width: 12,
-      height: 12,
-      borderRadius: 6,
-    },
-    feedLine: {
-      flex: 1,
-      width: 2,
-      backgroundColor: theme.borderColor,
-      marginTop: SPACING.xs,
-      borderRadius: 1,
+    feedCardPressed: {
+      opacity: 0.92,
     },
     feedCard: {
-      flex: 1,
-      marginBottom: SPACING.md,
+      width: '100%',
     },
     feedCardHeader: {
       flexDirection: 'row',

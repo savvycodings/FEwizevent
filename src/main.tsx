@@ -23,6 +23,8 @@ import {
   PlayerInfoDetail,
   Signup,
   BadgesCatalog,
+  AttendedEvents,
+  PlayerSearch,
 } from './screens'
 import FeatherIcon from '@expo/vector-icons/Feather'
 import Ionicons from '@expo/vector-icons/Ionicons'
@@ -155,6 +157,30 @@ function Tabs() {
           headerShown: true,
           header: ({ navigation }) => (
             <TopHeader title="Badges" showBack onBack={() => navigation.goBack()} />
+          ),
+          tabBarButton: () => null,
+          tabBarItemStyle: { display: 'none' },
+        }}
+      />
+      <Tab.Screen
+        name="AttendedEvents"
+        component={AttendedEvents}
+        options={{
+          headerShown: true,
+          header: ({ navigation }) => (
+            <TopHeader title="Attended events" showBack onBack={() => navigation.goBack()} />
+          ),
+          tabBarButton: () => null,
+          tabBarItemStyle: { display: 'none' },
+        }}
+      />
+      <Tab.Screen
+        name="PlayerSearch"
+        component={PlayerSearch}
+        options={{
+          headerShown: true,
+          header: ({ navigation }) => (
+            <TopHeader title="Find players" showBack onBack={() => navigation.goBack()} />
           ),
           tabBarButton: () => null,
           tabBarItemStyle: { display: 'none' },
