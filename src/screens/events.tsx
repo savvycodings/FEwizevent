@@ -17,6 +17,7 @@ import { ThemeContext } from '../context'
 import { Divider, EmptyState, Section, Surface } from '../components'
 import { RADIUS, SPACING, TYPOGRAPHY } from '../constants/layout'
 import { apiRequest } from '../api'
+import { formatLocationLabel } from '../utils/formatLocationLabel'
 
 type ApiEvent = {
   id: number
@@ -166,7 +167,7 @@ function EventBannerCard({
   onPress: (event: ApiEvent) => void
 }) {
   const dateLabel = formatEventDateLabel(event.eventDate)
-  const locationLabel = event.location?.trim() || 'Location TBA'
+  const locationLabel = formatLocationLabel(event.location)
   const hasBanner = Boolean(event.bannerImageUrl)
 
   return (

@@ -16,6 +16,7 @@ export { PlayerInfoDetail } from './playerInfoDetail'
 export { RankingLeaderboard } from './rankingLeaderboard'
 export { AccountManagement } from './accountManagement'
 export { EventPage } from './eventPage'
+export { PlayerSnapshot } from './playerSnapshot'
 export { BadgesCatalog } from './badgesCatalog'
 
 // Legacy screen exports are intentionally kept for future re-enable.

@@ -1,6 +1,6 @@
 import { useCallback, useContext, useState } from 'react'
-import { ScrollView, StyleProp, StyleSheet, Text, TextStyle, View } from 'react-native'
-import { useFocusEffect } from '@react-navigation/native'
+import { Pressable, ScrollView, StyleProp, StyleSheet, Text, TextStyle, View } from 'react-native'
+import { useFocusEffect, useNavigation } from '@react-navigation/native'
 import MaskedView from '@react-native-masked-view/masked-view'
 import { LinearGradient } from 'expo-linear-gradient'
 import { ThemeContext } from '../context'
@@ -50,6 +50,7 @@ const stylesForGradient = StyleSheet.create({
 export function RankingLeaderboard() {
   const { theme } = useContext(ThemeContext)
   const styles = getStyles(theme)
+  const navigation = useNavigation<any>()
   const [rows, setRows] = useState<RankingRow[]>([])
   const [error, setError] = useState<string | null>(null)
 
@@ -76,7 +77,16 @@ export function RankingLeaderboard() {
       <View style={styles.surface}>
         {error ? <Text style={styles.errorText}>{error}</Text> : null}
         {rows.map((row, index) => (
-          <ThemedCard key={row.id} premiumRim={index < 3} style={styles.rowCard}>
+          <Pressable
+            key={row.id}
+            onPress={() =>
+              navigation.navigate('PlayerSnapshot', { userId: row.id, userName: row.name })
+            }
+            style={({ pressed }) => [pressed && styles.rowPressed]}
+            accessibilityRole="button"
+            accessibilityLabel={`View stats for ${row.name}`}
+          >
+          <ThemedCard premiumRim={index < 3} style={styles.rowCard}>
             <CardCaption caption={`${row.rank} · ${row.xp} XP`}>
               <View style={styles.rowInner}>
                 <MedalGradientText
@@ -94,6 +104,7 @@ export function RankingLeaderboard() {
               </View>
             </CardCaption>
           </ThemedCard>
+          </Pressable>
         ))}
       </View>
     </ScrollView>
@@ -125,6 +136,7 @@ const getStyles = (theme: any) =>
       marginBottom: SPACING.sm,
     },
     rowCard: { marginBottom: SPACING.md },
+    rowPressed: { opacity: 0.88 },
     rowInner: {
       flexDirection: 'row',
       alignItems: 'center',

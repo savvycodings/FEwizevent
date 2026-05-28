@@ -10,6 +10,7 @@ import {
   AdminRoundBoard,
   AdminHub,
   EventPage,
+  PlayerSnapshot,
   Events,
   Home,
   Login,
@@ -25,10 +26,7 @@ import {
 } from './screens'
 import FeatherIcon from '@expo/vector-icons/Feather'
 import Ionicons from '@expo/vector-icons/Ionicons'
-import {
-  SafeAreaProvider,
-  useSafeAreaInsets,
-} from 'react-native-safe-area-context'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { AppContext, ThemeContext } from './context'
 import { SPACING, TYPOGRAPHY } from './constants/layout'
 
@@ -91,10 +89,16 @@ function TopHeader({
 
 function Tabs() {
   const { theme } = useContext(ThemeContext)
+  const insets = useSafeAreaInsets()
   const styles = getStyles({ theme, insets: { top: 0, bottom: 0, left: 0, right: 0 } })
 
   return (
-    <Tab.Navigator
+    <View style={styles.tabsRoot}>
+      {insets.top > 0 ? (
+        <View style={[styles.statusBarInset, { height: insets.top }]} />
+      ) : null}
+      <Tab.Navigator
+      style={{ flex: 1 }}
       screenOptions={{
         tabBarActiveTintColor: theme.tabBarActiveTintColor,
         tabBarInactiveTintColor: theme.tabBarInactiveTintColor,
@@ -303,7 +307,17 @@ function Tabs() {
           tabBarItemStyle: { display: 'none' },
         }}
       />
+      <Tab.Screen
+        name="PlayerSnapshot"
+        component={PlayerSnapshot}
+        options={{
+          headerShown: false,
+          tabBarButton: () => null,
+          tabBarItemStyle: { display: 'none' },
+        }}
+      />
     </Tab.Navigator>
+    </View>
   )
 }
 
@@ -315,7 +329,7 @@ function MainComponent() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.statusBarInset} />
+      {!currentUser ? <View style={styles.statusBarInset} /> : null}
       {currentUser ? (
         <Stack.Navigator screenOptions={{ headerShown: false }}>
           <Stack.Screen name="Tabs" component={Tabs} />
@@ -331,11 +345,7 @@ function MainComponent() {
 }
 
 export function Main() {
-  return (
-    <SafeAreaProvider>
-      <MainComponent />
-    </SafeAreaProvider>
-  )
+  return <MainComponent />
 }
 
 const getStyles = ({ theme, insets }: { theme: any; insets: any }) =>
@@ -346,6 +356,9 @@ const getStyles = ({ theme, insets }: { theme: any; insets: any }) =>
       paddingBottom: insets.bottom,
       paddingLeft: insets.left,
       paddingRight: insets.right,
+    },
+    tabsRoot: {
+      flex: 1,
     },
     statusBarInset: {
       height: insets.top,
