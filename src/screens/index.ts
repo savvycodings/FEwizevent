@@ -16,7 +16,10 @@ export { PlayerInfoDetail } from './playerInfoDetail'
 export { RankingLeaderboard } from './rankingLeaderboard'
 export { AccountManagement } from './accountManagement'
 export { EventPage } from './eventPage'
+export { PlayerSnapshot } from './playerSnapshot'
 export { BadgesCatalog } from './badgesCatalog'
+export { AttendedEvents } from './attendedEvents'
+export { PlayerSearch } from './playerSearch'
 
 // Legacy screen exports are intentionally kept for future re-enable.
 export { Chat as LegacyChat } from './chat'

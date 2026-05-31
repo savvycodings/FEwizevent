@@ -22,7 +22,6 @@ import { getAdminPassHeaders } from '../adminSession'
 import {
   canPlacementDown,
   canPlacementUp,
-  getTakenPlacements,
   nextPlacementDown,
   nextPlacementUp,
 } from '../utils/placementUtils'
@@ -139,14 +138,7 @@ export function Admin() {
     const key = `${userId}:${eventId}`
     const raw = placementMap[key]
     const cur = raw == null || raw < 1 ? null : raw
-    const eventRows = attendance
-      .filter((row) => row.eventId === eventId)
-      .map((row) => ({
-        userId: row.userId,
-        placement: placementMap[`${row.userId}:${eventId}`] ?? null,
-      }))
-    const taken = getTakenPlacements(eventRows, userId)
-    const next = delta === -1 ? nextPlacementDown(cur, taken) : nextPlacementUp(cur, taken)
+    const next = delta === -1 ? nextPlacementDown(cur) : nextPlacementUp(cur)
 
     if (delta === -1 && cur != null && next === null) {
       try {
@@ -369,15 +361,8 @@ export function Admin() {
                     const place = placementMap[key]
                     const placeNum = place == null || place < 1 ? null : place
                     const placeLabel = placeNum == null ? '—' : ordinalPlacement(placeNum)
-                    const eventRows = attendance
-                      .filter((row) => row.eventId === eventId)
-                      .map((row) => ({
-                        userId: row.userId,
-                        placement: placementMap[`${row.userId}:${eventId}`] ?? null,
-                      }))
-                    const taken = getTakenPlacements(eventRows, user.id)
-                    const canDecrement = canPlacementDown(placeNum, taken)
-                    const canIncrement = canPlacementUp(placeNum, taken)
+                    const canDecrement = canPlacementDown(placeNum)
+                    const canIncrement = canPlacementUp(placeNum)
                     return (
                       <View key={user.id} style={styles.userRow}>
                         <View style={styles.userIdentity}>

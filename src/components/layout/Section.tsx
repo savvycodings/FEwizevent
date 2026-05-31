@@ -12,6 +12,10 @@ interface SectionProps {
   compactTopSpacing?: boolean
   /** When false, no rule under the header (e.g. tight stacks). Default true. */
   showDivider?: boolean
+  /** Uses h3 sizing instead of default h4. */
+  largeTitle?: boolean
+  /** No top margin; parent controls vertical rhythm (e.g. surface gap). */
+  embedded?: boolean
 }
 
 export function Section({
@@ -21,12 +25,20 @@ export function Section({
   children,
   compactTopSpacing = false,
   showDivider = true,
+  largeTitle = false,
+  embedded = false,
 }: SectionProps) {
   const { theme } = useContext(ThemeContext)
-  const styles = getStyles(theme)
+  const styles = getStyles(theme, largeTitle)
 
   return (
-    <View style={[styles.section, compactTopSpacing && styles.sectionCompact]}>
+    <View
+      style={[
+        styles.section,
+        embedded && styles.sectionEmbedded,
+        !embedded && compactTopSpacing && styles.sectionCompact,
+      ]}
+    >
       <View style={styles.headerBlock}>
         <View style={styles.headerRow}>
           <Text style={styles.title}>{title}</Text>
@@ -44,16 +56,20 @@ export function Section({
   )
 }
 
-const getStyles = (theme: any) =>
-  StyleSheet.create({
+const getStyles = (theme: any, largeTitle: boolean) => {
+  const titleSize = largeTitle ? TYPOGRAPHY.h3 : TYPOGRAPHY.h4
+  return StyleSheet.create({
     section: {
       marginTop: SPACING.sectionGap,
     },
     sectionCompact: {
       marginTop: SPACING.lg,
     },
+    sectionEmbedded: {
+      marginTop: 0,
+    },
     headerBlock: {
-      marginBottom: SPACING.sm,
+      marginBottom: SPACING.sectionTitleBottom,
     },
     headerRow: {
       flexDirection: 'row',
@@ -63,10 +79,10 @@ const getStyles = (theme: any) =>
     title: {
       color: theme.textColor,
       fontFamily: theme.boldFont,
-      fontSize: TYPOGRAPHY.h4,
+      fontSize: titleSize,
       flex: 1,
       paddingRight: SPACING.md,
-      lineHeight: TYPOGRAPHY.h4 * 1.2,
+      lineHeight: titleSize * 1.2,
     },
     subtitle: {
       marginTop: SPACING.xs,
@@ -82,3 +98,4 @@ const getStyles = (theme: any) =>
       textDecorationLine: 'underline',
     },
   })
+}

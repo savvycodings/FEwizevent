@@ -14,9 +14,10 @@ import { useFocusEffect, useNavigation } from '@react-navigation/native'
 import { BlurView } from 'expo-blur'
 import Ionicons from '@expo/vector-icons/Ionicons'
 import { ThemeContext } from '../context'
-import { Divider, EmptyState, Section, Surface } from '../components'
+import { EmptyState, Section, Surface } from '../components'
 import { RADIUS, SPACING, TYPOGRAPHY } from '../constants/layout'
 import { apiRequest } from '../api'
+import { formatLocationLabel } from '../utils/formatLocationLabel'
 
 type ApiEvent = {
   id: number
@@ -51,21 +52,14 @@ const getStyles = (theme: any) =>
     hero: {
       backgroundColor: theme.tintColor,
       paddingHorizontal: SPACING.containerPadding,
-      paddingTop: SPACING['2xl'],
+      paddingTop: SPACING.sectionGap,
       paddingBottom: SPACING['3xl'],
     },
     heroTitle: {
       color: theme.backgroundColor,
       fontFamily: theme.boldFont,
-      fontSize: TYPOGRAPHY.h2,
-    },
-    heroSubtitle: {
-      marginTop: SPACING.sm,
-      color: theme.backgroundColor,
-      fontFamily: theme.regularFont,
-      fontSize: TYPOGRAPHY.bodySmall,
-      opacity: 0.92,
-      lineHeight: TYPOGRAPHY.bodySmall * 1.4,
+      fontSize: TYPOGRAPHY.h1,
+      lineHeight: TYPOGRAPHY.h1 * 1.15,
     },
     surface: {
       marginTop: -SPACING['2xl'],
@@ -73,7 +67,9 @@ const getStyles = (theme: any) =>
       borderTopRightRadius: RADIUS.xl,
       backgroundColor: theme.backgroundColor,
       paddingHorizontal: SPACING.containerPadding,
-      paddingTop: SPACING.xl,
+      paddingTop: SPACING.sectionGap,
+      paddingBottom: SPACING.sectionGap,
+      gap: SPACING.sectionGap,
     },
     searchRow: {
       flexDirection: 'row',
@@ -166,7 +162,7 @@ function EventBannerCard({
   onPress: (event: ApiEvent) => void
 }) {
   const dateLabel = formatEventDateLabel(event.eventDate)
-  const locationLabel = event.location?.trim() || 'Location TBA'
+  const locationLabel = formatLocationLabel(event.location)
   const hasBanner = Boolean(event.bannerImageUrl)
 
   return (
@@ -235,7 +231,6 @@ export function Events() {
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
       <View style={styles.hero}>
         <Text style={styles.heroTitle}>Event Locator</Text>
-        <Text style={styles.heroSubtitle}>Find tournaments, venues, and featured events.</Text>
       </View>
       <View style={styles.surface}>
         <Surface style={{ borderRadius: RADIUS.full }}>
@@ -250,13 +245,8 @@ export function Events() {
             </View>
           </View>
         </Surface>
-        <Divider faint spacing="lg" />
 
-        <Section
-          title="Featured events"
-          subtitle="Tap an event for details and rankings."
-          compactTopSpacing
-        >
+        <Section title="Featured events" largeTitle embedded>
           {eventsError ? <Text style={styles.eventsError}>{eventsError}</Text> : null}
           {featuredEvents.length > 0
             ? featuredEvents.map((event, index) => (
@@ -276,11 +266,7 @@ export function Events() {
               ) : null}
         </Section>
 
-        <Section
-          title="Upcoming events"
-          subtitle="Tournament schedule and sign-ups will appear here."
-          compactTopSpacing
-        >
+        <Section title="Upcoming events" largeTitle embedded>
           <EmptyState
             variant="mutedBand"
             message="No scheduled events yet. Check back soon."

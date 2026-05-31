@@ -21,10 +21,8 @@ import {
 import {
   canPlacementDown,
   canPlacementUp,
-  getTakenPlacements,
   nextPlacementDown,
   nextPlacementUp,
-  PLACEMENT_MAX,
 } from '../utils/placementUtils'
 
 type User = {
@@ -115,12 +113,8 @@ export function AdminPlayerAttendance() {
   const placeNum =
     current?.placement == null || Number(current.placement) < 1 ? null : Number(current.placement)
   const placeLabel = placeNum == null ? '—' : ordinalPlacement(placeNum)
-  const takenPlacements = useMemo(
-    () => getTakenPlacements(placementBoard, userId),
-    [placementBoard, userId]
-  )
-  const canPlaceUp = canPlacementUp(placeNum, takenPlacements)
-  const canPlaceDown = canPlacementDown(placeNum, takenPlacements)
+  const canPlaceUp = canPlacementUp(placeNum)
+  const canPlaceDown = canPlacementDown(placeNum)
   const duplicatePlacements = useMemo(() => {
     const counts = new Map<number, number>()
     for (const row of placementBoard) {
@@ -199,8 +193,7 @@ export function AdminPlayerAttendance() {
   async function bumpPlacement(delta: -1 | 1) {
     if (!eventId || !userId) return
     const cur = placeNum
-    const taken = getTakenPlacements(placementBoard, userId)
-    const next = delta === -1 ? nextPlacementDown(cur, taken) : nextPlacementUp(cur, taken)
+    const next = delta === -1 ? nextPlacementDown(cur) : nextPlacementUp(cur)
     if (delta === -1 && cur != null && next === null) {
       // Below current rank is all taken — clear placement
       try {

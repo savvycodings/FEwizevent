@@ -17,7 +17,8 @@ import { LinearGradient } from 'expo-linear-gradient'
 import { ThemeContext } from '../context'
 import { apiRequest } from '../api'
 import { RADIUS, SPACING, TYPOGRAPHY } from '../constants/layout'
-import { Section, ThemedCard, CardCaption, Surface, Divider } from '../components'
+import { Section, ThemedCard, Surface, Divider } from '../components'
+import { formatLocationLabel } from '../utils/formatLocationLabel'
 
 type ApiEvent = {
   id: number
@@ -145,6 +146,17 @@ export function EventPage() {
     [isWideLayout]
   )
 
+  const openPlayerSnapshot = useCallback(
+    (entry: LeaderboardEntry) => {
+      navigation.navigate('PlayerSnapshot', {
+        userId: entry.userId,
+        userName: entry.userName,
+        eventTitle: event?.title ?? routeEvent?.title,
+      })
+    },
+    [navigation, event?.title, routeEvent?.title]
+  )
+
   const loadEventLeaderboard = useCallback(async () => {
     if (!routeEvent?.id) {
       setError('Missing event details')
@@ -184,7 +196,7 @@ export function EventPage() {
   )
 
   const dateLabel = formatEventDateLabel(event?.eventDate ?? null)
-  const locationLabel = event?.location?.trim() || 'Location TBA'
+  const locationLabel = formatLocationLabel(event?.location)
 
   return (
     <ScrollView
@@ -227,16 +239,16 @@ export function EventPage() {
         <Section title="At a glance" compactTopSpacing>
           <View style={styles.infoBadgeRow}>
             <Surface style={styles.infoBadge}>
-              <CardCaption caption="Marked present for this event">
+              <View style={styles.infoBadgeInner}>
                 <Text style={styles.infoLabel}>Attendees</Text>
                 <Text style={styles.infoValue}>{stats.attendeeCount}</Text>
-              </CardCaption>
+              </View>
             </Surface>
             <Surface style={styles.infoBadge}>
-              <CardCaption caption="Ranked / placement recorded">
+              <View style={styles.infoBadgeInner}>
                 <Text style={styles.infoLabel}>Participants</Text>
                 <Text style={styles.infoValue}>{stats.participantCount}</Text>
-              </CardCaption>
+              </View>
             </Surface>
           </View>
           {error ? <Text style={styles.errorText}>{error}</Text> : null}
@@ -265,7 +277,13 @@ export function EventPage() {
                   </View>
                   <Divider faint spacing="sm" />
                   {leaderboard.map((entry) => (
-                    <View key={`${entry.userId}-${entry.placement ?? 'na'}`}>
+                    <Pressable
+                      key={`${entry.userId}-${entry.placement ?? 'na'}`}
+                      onPress={() => openPlayerSnapshot(entry)}
+                      style={({ pressed }) => [pressed && styles.tableRowPressed]}
+                      accessibilityRole="button"
+                      accessibilityLabel={`View stats for ${entry.userName || entry.userEmail}`}
+                    >
                       <View style={styles.tableRow}>
                         <View style={[styles.tdPlace, { width: col.place }]}>
                           <MedalGradientText
@@ -299,7 +317,7 @@ export function EventPage() {
                         </Text>
                       </View>
                       <View style={styles.rowRule} />
-                    </View>
+                    </Pressable>
                   ))}
                 </View>
               </ScrollView>
@@ -384,21 +402,24 @@ const getStyles = (theme: any) =>
     },
     infoBadge: {
       flex: 1,
-      alignItems: 'stretch',
-      justifyContent: 'flex-start',
+    },
+    infoBadgeInner: {
+      alignItems: 'center',
+      justifyContent: 'center',
+      minHeight: 88,
     },
     infoLabel: {
       color: theme.textColor,
       fontFamily: theme.mediumFont,
       fontSize: TYPOGRAPHY.h4,
-      textAlign: 'left',
+      textAlign: 'center',
     },
     infoValue: {
-      marginTop: 2,
+      marginTop: SPACING.xs,
       color: theme.textColor,
       fontFamily: theme.boldFont,
       fontSize: TYPOGRAPHY.h2,
-      textAlign: 'left',
+      textAlign: 'center',
     },
     errorText: {
       marginTop: SPACING.sm,
@@ -430,6 +451,10 @@ const getStyles = (theme: any) =>
       alignItems: 'center',
       paddingVertical: SPACING.sm,
       gap: SPACING.xs,
+    },
+    tableRowPressed: {
+      opacity: 0.88,
+      backgroundColor: theme.surfaceMuted ?? 'rgba(255,255,255,0.06)',
     },
     rowRule: {
       height: StyleSheet.hairlineWidth * 2,
