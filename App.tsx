@@ -21,6 +21,7 @@ import {
 import { StyleSheet, LogBox } from 'react-native'
 import { StatusBar } from 'expo-status-bar'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
+import { linking } from './src/navigation/linking'
 
 LogBox.ignoreLogs([
   'Key "cancelled" in the image picker result is deprecated and will be removed in SDK 48, use "canceled" instead',
@@ -32,6 +33,7 @@ export default function App() {
   const [chatType, setChatType] = useState<Model>(MODELS.claudeOpus)
   const [imageModel, setImageModel] = useState<string>(IMAGE_MODELS.nanoBanana.label)
   const [currentUser, setCurrentUser] = useState<User | null>(null)
+  const [authReady, setAuthReady] = useState(false)
   const [modalVisible, setModalVisible] = useState<boolean>(false)
     const [fontsLoaded] = useFonts({
     'Geist-Regular': require('./assets/fonts/Geist-Regular.otf'),
@@ -68,6 +70,8 @@ export default function App() {
       await hydrateAdminPass()
     } catch (err) {
       console.log('error configuring storage', err)
+    } finally {
+      setAuthReady(true)
     }
   }
 
@@ -113,7 +117,7 @@ export default function App() {
 
   const bottomSheetStyles = getBottomsheetStyles(getTheme(theme))
 
-  if (!fontsLoaded) return null
+  if (!fontsLoaded || !authReady) return null
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
@@ -135,7 +139,7 @@ export default function App() {
           setTheme: _setTheme
           }}>
           <ActionSheetProvider>
-            <NavigationContainer>
+            <NavigationContainer linking={currentUser ? linking : undefined}>
               <StatusBar style="dark" />
               <Main />
             </NavigationContainer>

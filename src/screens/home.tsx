@@ -25,6 +25,10 @@ import {
   type BadgeId,
 } from '../data/badgesCatalog'
 import { apiRequest } from '../api'
+import QRCode from 'react-native-qrcode-svg'
+import { getPlayerProfileDeepLink } from '../utils/playerProfileLink'
+
+const QR_MODAL_SIZE = 256
 
 interface HomeProps {
   navigation: any
@@ -121,6 +125,7 @@ export function Home({ navigation }: HomeProps) {
   const [rankSummary, setRankSummary] = useState<RankSummary>({ xp: 0, rank: 'Bronze' })
   const [earnedBadges, setEarnedBadges] = useState<EarnedBadge[]>([])
   const [selectedBadge, setSelectedBadge] = useState<EarnedBadge | null>(null)
+  const [qrModalVisible, setQrModalVisible] = useState(false)
 
   const loadHome = useCallback(async () => {
     if (!currentUser?.id) {
@@ -192,6 +197,8 @@ export function Home({ navigation }: HomeProps) {
   )
 
   const displayName = currentUser?.name || profile.trainerName
+  const profileDeepLink =
+    currentUser?.id && currentUser.id > 0 ? getPlayerProfileDeepLink(currentUser.id) : null
 
   return (
     <View style={styles.screenRoot}>
@@ -217,9 +224,20 @@ export function Home({ navigation }: HomeProps) {
             <View style={styles.heroTextWrap}>
               <Text style={styles.heroGreeting}>Welcome back</Text>
               <View style={styles.heroNameRow}>
-                <Text style={styles.heroName} numberOfLines={1}>
-                  {displayName}
-                </Text>
+                <Pressable
+                  onPress={() => profileDeepLink && setQrModalVisible(true)}
+                  disabled={!profileDeepLink}
+                  style={({ pressed }) => [
+                    styles.heroNamePressable,
+                    pressed && profileDeepLink && styles.heroNamePressed,
+                  ]}
+                  accessibilityRole="button"
+                  accessibilityLabel="Show my profile QR code"
+                >
+                  <Text style={styles.heroName} numberOfLines={1}>
+                    {displayName}
+                  </Text>
+                </Pressable>
                 <Pressable
                   onPress={() => navigation.navigate('PlayerSearch')}
                   style={({ pressed }) => [styles.heroSearchBtn, pressed && styles.heroSearchBtnPressed]}
@@ -411,6 +429,39 @@ export function Home({ navigation }: HomeProps) {
           </Pressable>
         </Pressable>
       </Modal>
+
+      <Modal
+        visible={qrModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setQrModalVisible(false)}
+      >
+        <Pressable style={styles.qrModalBackdrop} onPress={() => setQrModalVisible(false)}>
+          <Pressable style={styles.qrModalCard} onPress={() => {}}>
+            {profileDeepLink ? (
+              <>
+                <View style={styles.qrModalQuietZone}>
+                  <QRCode
+                    value={profileDeepLink}
+                    size={QR_MODAL_SIZE}
+                    backgroundColor="#ffffff"
+                    color="#000000"
+                  />
+                </View>
+                <Text style={styles.qrModalCaption}>Scan to view profile</Text>
+                <Pressable
+                  onPress={() => setQrModalVisible(false)}
+                  style={styles.qrModalClose}
+                  accessibilityRole="button"
+                  accessibilityLabel="Close"
+                >
+                  <Text style={styles.qrModalCloseText}>Close</Text>
+                </Pressable>
+              </>
+            ) : null}
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   )
 }
@@ -497,13 +548,18 @@ const getStyles = (theme: any) =>
       fontFamily: theme.boldFont,
       fontSize: TYPOGRAPHY.h3,
     },
-    heroName: {
+    heroNamePressable: {
       flex: 1,
+      minWidth: 0,
+    },
+    heroNamePressed: {
+      opacity: 0.65,
+    },
+    heroName: {
       color: '#000',
       fontFamily: theme.boldFont,
       fontSize: TYPOGRAPHY.h2,
       letterSpacing: -0.3,
-      minWidth: 0,
     },
     rankPill: {
       flexDirection: 'row',
@@ -773,5 +829,44 @@ const getStyles = (theme: any) =>
       fontSize: TYPOGRAPHY.bodySmall,
       textAlign: 'center',
       marginTop: SPACING.sm,
+    },
+    qrModalBackdrop: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.65)',
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: SPACING.containerPadding,
+    },
+    qrModalCard: {
+      width: '100%',
+      maxWidth: 320,
+      alignItems: 'center',
+      backgroundColor: theme.backgroundColor,
+      borderRadius: RADIUS.lg,
+      padding: SPACING.xl,
+      borderWidth: StyleSheet.hairlineWidth * 2,
+      borderColor: theme.borderColor,
+    },
+    qrModalQuietZone: {
+      padding: SPACING.md,
+      backgroundColor: '#ffffff',
+      borderRadius: RADIUS.md,
+    },
+    qrModalCaption: {
+      marginTop: SPACING.lg,
+      color: theme.textColor,
+      fontFamily: theme.semiBoldFont,
+      fontSize: TYPOGRAPHY.body,
+      textAlign: 'center',
+    },
+    qrModalClose: {
+      marginTop: SPACING.lg,
+      paddingVertical: SPACING.sm,
+      paddingHorizontal: SPACING.xl,
+    },
+    qrModalCloseText: {
+      color: theme.tintColor,
+      fontFamily: theme.semiBoldFont,
+      fontSize: TYPOGRAPHY.body,
     },
   })
