@@ -1,11 +1,13 @@
 import { useCallback, useContext, useState } from 'react'
-import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native'
 import Ionicons from '@expo/vector-icons/Ionicons'
 import { ThemeContext } from '../context'
 import { Divider, Section, Surface, ThemedCard } from '../components'
 import { RADIUS, SPACING, TYPOGRAPHY } from '../constants/layout'
 import { apiRequest } from '../api'
+import QRCode from 'react-native-qrcode-svg'
+import { getPlayerProfileDeepLink } from '../utils/playerProfileLink'
 
 type SnapshotUser = {
   id: number
@@ -33,6 +35,9 @@ type SnapshotResponse = {
   user: SnapshotUser
   snapshot: PlayerSnapshotStats
 }
+
+const QR_THUMB_SIZE = 36
+const QR_MODAL_SIZE = 256
 
 const RANK_BADGE: Record<string, number> = {
   Bronze: require('../../assets/ranked/bronze.png'),
@@ -73,6 +78,7 @@ export function PlayerSnapshot() {
   const [snapshot, setSnapshot] = useState<PlayerSnapshotStats | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  const [qrModalVisible, setQrModalVisible] = useState(false)
 
   const load = useCallback(async () => {
     if (!userId) {
@@ -107,7 +113,12 @@ export function PlayerSnapshot() {
     user?.name ||
     'Player'
 
+  const profileLinkUserId = user?.id ?? userId
+  const profileDeepLink =
+    profileLinkUserId > 0 ? getPlayerProfileDeepLink(profileLinkUserId) : null
+
   return (
+    <>
     <ScrollView
       style={styles.screen}
       contentContainerStyle={styles.content}
@@ -127,6 +138,23 @@ export function PlayerSnapshot() {
             <Text style={styles.heroTitle} numberOfLines={2}>
               {displayName}
             </Text>
+            {profileDeepLink ? (
+              <Pressable
+                onPress={() => setQrModalVisible(true)}
+                style={styles.qrThumbWrap}
+                accessibilityRole="button"
+                accessibilityLabel="Show profile QR code"
+              >
+                <View style={styles.qrThumbQuietZone}>
+                  <QRCode
+                    value={profileDeepLink}
+                    size={QR_THUMB_SIZE}
+                    backgroundColor="#ffffff"
+                    color="#000000"
+                  />
+                </View>
+              </Pressable>
+            ) : null}
           </View>
         </View>
       </View>
@@ -188,6 +216,40 @@ export function PlayerSnapshot() {
         ) : null}
       </View>
     </ScrollView>
+
+    <Modal
+      visible={qrModalVisible}
+      transparent
+      animationType="fade"
+      onRequestClose={() => setQrModalVisible(false)}
+    >
+      <Pressable style={styles.qrModalBackdrop} onPress={() => setQrModalVisible(false)}>
+        <Pressable style={styles.qrModalCard} onPress={() => {}}>
+          {profileDeepLink ? (
+            <>
+              <View style={styles.qrModalQuietZone}>
+                <QRCode
+                  value={profileDeepLink}
+                  size={QR_MODAL_SIZE}
+                  backgroundColor="#ffffff"
+                  color="#000000"
+                />
+              </View>
+              <Text style={styles.qrModalCaption}>Scan to view profile</Text>
+              <Pressable
+                onPress={() => setQrModalVisible(false)}
+                style={styles.qrModalClose}
+                accessibilityRole="button"
+                accessibilityLabel="Close"
+              >
+                <Text style={styles.qrModalCloseText}>Close</Text>
+              </Pressable>
+            </>
+          ) : null}
+        </Pressable>
+      </Pressable>
+    </Modal>
+    </>
   )
 }
 
@@ -214,12 +276,16 @@ const getStyles = (theme: any) =>
     },
     titleRow: {
       width: '100%',
-      alignItems: 'center',
+      flexDirection: 'row',
+      alignItems: 'flex-start',
       justifyContent: 'center',
+      minHeight: 44,
     },
     backButton: {
       position: 'absolute',
       left: 0,
+      top: 0,
+      zIndex: 1,
       alignItems: 'center',
       justifyContent: 'center',
       padding: SPACING.xs,
@@ -228,8 +294,23 @@ const getStyles = (theme: any) =>
       color: '#000',
       fontFamily: theme.boldFont,
       fontSize: TYPOGRAPHY.h2,
+      flex: 1,
       flexShrink: 1,
       textAlign: 'center',
+      paddingLeft: 36,
+      paddingRight: 52,
+      paddingTop: SPACING.xs,
+    },
+    qrThumbWrap: {
+      position: 'absolute',
+      right: 0,
+      top: 0,
+      zIndex: 1,
+    },
+    qrThumbQuietZone: {
+      padding: 3,
+      backgroundColor: '#ffffff',
+      borderRadius: RADIUS.sm,
     },
     surface: {
       marginTop: -SPACING['2xl'],
@@ -245,6 +326,45 @@ const getStyles = (theme: any) =>
       fontFamily: theme.regularFont,
       fontSize: TYPOGRAPHY.bodySmall,
       marginBottom: SPACING.md,
+    },
+    qrModalBackdrop: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.65)',
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: SPACING.containerPadding,
+    },
+    qrModalCard: {
+      width: '100%',
+      maxWidth: 320,
+      alignItems: 'center',
+      backgroundColor: theme.backgroundColor,
+      borderRadius: RADIUS.lg,
+      padding: SPACING.xl,
+      borderWidth: StyleSheet.hairlineWidth * 2,
+      borderColor: theme.borderColor,
+    },
+    qrModalQuietZone: {
+      padding: SPACING.md,
+      backgroundColor: '#ffffff',
+      borderRadius: RADIUS.md,
+    },
+    qrModalCaption: {
+      marginTop: SPACING.lg,
+      color: theme.textColor,
+      fontFamily: theme.semiBoldFont,
+      fontSize: TYPOGRAPHY.body,
+      textAlign: 'center',
+    },
+    qrModalClose: {
+      marginTop: SPACING.lg,
+      paddingVertical: SPACING.sm,
+      paddingHorizontal: SPACING.xl,
+    },
+    qrModalCloseText: {
+      color: theme.tintColor,
+      fontFamily: theme.semiBoldFont,
+      fontSize: TYPOGRAPHY.body,
     },
     rankCard: {
       marginBottom: SPACING.sm,
