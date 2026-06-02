@@ -1,5 +1,5 @@
+import { useContext } from 'react'
 import {
-  Image,
   Pressable,
   StyleSheet,
   Text,
@@ -7,9 +7,9 @@ import {
   type StyleProp,
   type ViewStyle,
 } from 'react-native'
-import { useContext } from 'react'
 import { BlurView } from 'expo-blur'
 import { ThemeContext } from '../../context'
+import { RemoteImage } from '../ui/remote-image'
 import { BRAND } from '../../constants/brandColors'
 import { RADIUS, SPACING, TYPOGRAPHY } from '../../constants/layout'
 
@@ -42,9 +42,12 @@ export function EventBannerCard({
     >
       {hasBanner ? (
         <>
-          <Image
-            source={{ uri: bannerImageUrl! }}
+          <RemoteImage
+            uri={bannerImageUrl}
+            containerStyle={StyleSheet.absoluteFillObject}
             style={StyleSheet.absoluteFillObject}
+            spinnerSize={28}
+            spinnerColor={BRAND.onImageText}
             resizeMode="cover"
           />
           <BlurView intensity={90} tint="dark" style={StyleSheet.absoluteFillObject} />

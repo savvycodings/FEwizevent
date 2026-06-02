@@ -1,8 +1,9 @@
 import { useCallback, useContext, useState } from 'react'
-import { ActivityIndicator, View } from 'react-native'
+import { View } from 'react-native'
 import { useFocusEffect } from '@react-navigation/native'
 import { DeckRadarChart } from '@/components/charts/DeckRadarChart'
 import type { DeckRadarStat } from '@/components/charts/deckRadarAxes'
+import { RainSpinner } from '@/components/ui/rain-spinner'
 import { ThemeContext } from '../../context'
 import { apiRequest } from '@/api'
 import { SPACING } from '@/constants/layout'
@@ -36,7 +37,7 @@ export function CommunityDeckMetaSection() {
   )
 
   if (loading) {
-    return <ActivityIndicator color={theme.tintColor} style={{ paddingVertical: SPACING.xl }} />
+    return <RainSpinner size={24} color={theme.tintColor} style={{ paddingVertical: SPACING.xl }} />
   }
 
   return (

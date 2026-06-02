@@ -15,6 +15,7 @@ import { useNavigation, useRoute } from '@react-navigation/native'
 import { ThemeContext } from '../context'
 import { BRAND } from '../constants/brandColors'
 import {
+  ConnectedTabPills,
   EventDateField,
   Input,
   Label,
@@ -239,6 +240,10 @@ export function Admin() {
       Alert.alert('Validation', 'Event title is required')
       return
     }
+    if (!bannerImageUrl) {
+      Alert.alert('Validation', 'Upload an event banner')
+      return
+    }
     await apiRequest('/admin/events', {
       method: 'POST',
       body: JSON.stringify({
@@ -312,32 +317,23 @@ export function Admin() {
             <Label nativeID="event-tier" className="mb-2">
               Event tier
             </Label>
-            <UiText variant="muted" className="mb-2">
-              Every event has a tier that multiplies earned XP. Set when creating the event.
-            </UiText>
-            <SegmentedTabs<EventTier>
+            <ConnectedTabPills<EventTier>
               style={styles.tierTabs}
               value={eventTier}
               onChange={setEventTier}
               options={EVENT_TIER_SEGMENT_OPTIONS}
+              accessibilityLabelPrefix="Event tier"
             />
             <UiText variant="muted" className="mb-1 mt-2 text-[11px]">
               {EVENT_TIER_EXAMPLES[eventTier]} · {formatTierMultiplier(eventTier)} XP
             </UiText>
 
-            <UiText className="mb-1 mt-3 text-sm font-medium text-foreground">Event banner (optional)</UiText>
-            <UiText variant="muted" className="mb-3">
-              Wide image works best. Shown on the Events tab with a blurred background.
-            </UiText>
+            <Label nativeID="event-banner" className="mb-2 mt-3">
+              Event banner
+            </Label>
             {bannerImageUrl ? (
               <View style={styles.bannerPreviewWrap}>
                 <Image source={{ uri: bannerImageUrl }} style={styles.bannerPreview} />
-                <ThemedButton
-                  label="Remove banner"
-                  variant="outline"
-                  style={styles.bannerRemove}
-                  onPress={() => setBannerImageUrl(null)}
-                />
               </View>
             ) : null}
             <ThemedButton
@@ -674,11 +670,7 @@ const getStyles = (theme: any) =>
       width: '100%',
       height: 100,
       borderRadius: RADIUS.md,
-      marginBottom: SPACING.sm,
       backgroundColor: theme.buttonBackground,
-    },
-    bannerRemove: {
-      marginBottom: SPACING.sm,
     },
     saveEvent: {
       marginTop: SPACING.md,

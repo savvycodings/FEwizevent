@@ -1,6 +1,6 @@
-import { useCallback, useContext, useEffect, useState } from 'react'
+import { useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import {
-  ActivityIndicator,
+  Image,
   Modal,
   Pressable,
   ScrollView,
@@ -13,6 +13,7 @@ import { AppIcon } from '../components'
 import { AppContext, ThemeContext } from '../context'
 import {
   EmptyState,
+  RainSpinner,
   SearchField,
   Section,
   Text,
@@ -67,6 +68,18 @@ const RANK_BADGE: Record<string, number> = {
   Platinum: require('../../assets/ranked/platnuim.png'),
   Diamond: require('../../assets/ranked/diomand.png'),
   Champion: require('../../assets/ranked/champion.png'),
+}
+
+const COMPARE_PLAYER_SAMPLE = 10
+
+function pickRandomPlayers(players: PlayerPick[], count: number): PlayerPick[] {
+  if (players.length <= count) return players
+  const copy = [...players]
+  for (let i = copy.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[copy[i], copy[j]] = [copy[j], copy[i]]
+  }
+  return copy.slice(0, count)
 }
 
 export function Profile() {
@@ -207,14 +220,22 @@ export function Profile() {
   )
 
   const searchPlayers = useCallback(async (q: string) => {
+    const trimmed = q.trim()
+    if (trimmed.length === 1) {
+      setPlayerHits([])
+      return
+    }
     const path =
-      q.trim().length >= 2
-        ? `/auth/players?q=${encodeURIComponent(q.trim())}`
+      trimmed.length >= 2
+        ? `/auth/players?q=${encodeURIComponent(trimmed)}`
         : '/auth/players'
     try {
       setPlayerSearchLoading(true)
       const res = await apiRequest<{ players: PlayerPick[] }>(path)
-      const list = (res.players ?? []).filter((p) => p.id !== currentUser?.id)
+      let list = (res.players ?? []).filter((p) => p.id !== currentUser?.id)
+      if (trimmed.length < 2) {
+        list = pickRandomPlayers(list, COMPARE_PLAYER_SAMPLE)
+      }
       setPlayerHits(list)
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Player search failed'
@@ -226,6 +247,27 @@ export function Profile() {
       setPlayerSearchLoading(false)
     }
   }, [currentUser?.id])
+
+  useEffect(() => {
+    if (!compareModal) return
+    const trimmed = playerQuery.trim()
+    if (trimmed.length === 1) {
+      setPlayerHits([])
+      return
+    }
+    const delay = trimmed.length >= 2 ? 250 : 0
+    const t = setTimeout(() => searchPlayers(playerQuery), delay)
+    return () => clearTimeout(t)
+  }, [compareModal, playerQuery, searchPlayers])
+
+  const comparePickerHint = useMemo(() => {
+    const trimmed = playerQuery.trim()
+    if (trimmed.length === 1) return 'Type at least 2 characters to search.'
+    if (!playerSearchLoading && trimmed.length >= 2 && playerHits.length === 0) {
+      return 'No players found.'
+    }
+    return null
+  }, [playerQuery, playerSearchLoading, playerHits.length])
 
   const cached = currentUser?.id ? getCachedPlayerStats(currentUser.id) : null
   const displayRank =
@@ -268,7 +310,7 @@ export function Profile() {
 
             <Section title="Rank growth" embedded>
               {loading ? (
-                <ActivityIndicator color={theme.tintColor} style={styles.chartLoader} />
+                <RainSpinner size={24} color={theme.tintColor} style={styles.chartLoader} />
               ) : error ? (
                 <EmptyState message={error} />
               ) : data ? (
@@ -328,8 +370,8 @@ export function Profile() {
                     label="Compare player"
                     leftIcon={<AppIcon name="users" size={18} color={theme.tintColor} />}
                     onPress={() => {
+                      setPlayerQuery('')
                       setCompareModal(true)
-                      searchPlayers('')
                     }}
                   />
                 )}
@@ -346,36 +388,64 @@ export function Profile() {
         </ScreenSurface>
       </ScrollView>
 
-      <Modal visible={compareModal} animationType="slide" transparent onRequestClose={() => setCompareModal(false)}>
-        <Pressable style={styles.modalBackdrop} onPress={() => setCompareModal(false)}>
-          <Pressable style={styles.modalSheet} onPress={(e) => e.stopPropagation()}>
+      <Modal
+        visible={compareModal}
+        animationType="slide"
+        transparent
+        onRequestClose={() => {
+          setCompareModal(false)
+          setPlayerQuery('')
+        }}
+      >
+        <Pressable
+          style={styles.modalBackdrop}
+          onPress={() => {
+            setCompareModal(false)
+            setPlayerQuery('')
+          }}
+        >
+          <Pressable
+            style={[styles.modalSheet, { paddingBottom: Math.max(insets.bottom, SPACING.lg) + SPACING.lg }]}
+            onPress={(e) => e.stopPropagation()}
+          >
             <Text variant="h4" className="mb-3 text-foreground">
               Compare player
             </Text>
             <SearchField
               value={playerQuery}
-              onChangeText={(t) => {
-                setPlayerQuery(t)
-                searchPlayers(t)
-              }}
+              onChangeText={setPlayerQuery}
               placeholder="Search players"
               autoCapitalize="none"
               containerClassName="mb-3 rounded-lg border border-border bg-card px-3"
             />
+            {comparePickerHint ? (
+              <Text variant="muted" className="mb-2">
+                {comparePickerHint}
+              </Text>
+            ) : null}
             {playerSearchLoading ? (
-              <ActivityIndicator color={theme.tintColor} />
+              <RainSpinner size={22} color={theme.tintColor} style={styles.searchLoader} />
             ) : (
-              <ScrollView style={{ maxHeight: 320 }}>
+              <ScrollView style={styles.pickList}>
                 {playerHits.map((p) => (
                   <Pressable
                     key={p.id}
                     onPress={() => beginCompare(p)}
-                    style={({ pressed }) => [styles.pickRow, pressed && { opacity: 0.8 }]}
+                    style={({ pressed }) => [styles.pickRow, pressed && styles.pickRowPressed]}
                   >
-                    <Text className="font-medium text-foreground">{p.name}</Text>
-                    <Text variant="muted" className="text-xs">
-                      {p.rank} · {p.xp} XP
-                    </Text>
+                    <View style={styles.pickRowInner}>
+                      <View style={styles.pickMain}>
+                        <Text style={styles.pickLine} numberOfLines={1}>
+                          <Text style={styles.pickName}>{p.name}</Text>
+                          <Text style={styles.pickMeta}> · {p.xp} XP</Text>
+                        </Text>
+                      </View>
+                      <Image
+                        source={RANK_BADGE[p.rank] ?? RANK_BADGE.Bronze}
+                        style={styles.pickRankBadge}
+                        resizeMode="contain"
+                      />
+                    </View>
                   </Pressable>
                 ))}
               </ScrollView>
@@ -404,6 +474,9 @@ const getStyles = (theme: any) =>
     },
     chartLoader: {
       paddingVertical: SPACING.xl,
+    },
+    searchLoader: {
+      paddingVertical: SPACING.lg,
     },
     compareBlock: {
       marginTop: SPACING.lg,
@@ -457,8 +530,11 @@ const getStyles = (theme: any) =>
       flex: 1,
       backgroundColor: 'rgba(0,0,0,0.55)',
       justifyContent: 'flex-end',
+      paddingTop: SPACING['4xl'],
     },
     modalSheet: {
+      width: '100%',
+      maxHeight: '82%',
       backgroundColor: theme.cardBackground,
       borderTopLeftRadius: RADIUS.xl,
       borderTopRightRadius: RADIUS.xl,
@@ -467,9 +543,49 @@ const getStyles = (theme: any) =>
       borderWidth: StyleSheet.hairlineWidth * 2,
       borderColor: theme.borderColor,
     },
+    pickList: {
+      maxHeight: 360,
+    },
     pickRow: {
-      paddingVertical: SPACING.md,
-      borderBottomWidth: StyleSheet.hairlineWidth * 2,
-      borderBottomColor: theme.borderColor,
+      marginBottom: SPACING.lg,
+      borderRadius: RADIUS.md,
+      borderWidth: 1,
+      borderColor: theme.borderColor,
+      backgroundColor: theme.backgroundColor,
+      paddingVertical: SPACING.sm,
+      paddingHorizontal: SPACING.sm,
+    },
+    pickRowPressed: {
+      opacity: 0.9,
+      borderColor: `${theme.tintColor}88`,
+      backgroundColor: `${theme.tintColor}10`,
+    },
+    pickRowInner: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: SPACING.sm,
+      minWidth: 0,
+    },
+    pickMain: {
+      flex: 1,
+      minWidth: 0,
+    },
+    pickLine: {
+      color: theme.textColor,
+      fontFamily: theme.regularFont,
+      fontSize: TYPOGRAPHY.bodySmall,
+    },
+    pickName: {
+      color: theme.textColor,
+      fontFamily: theme.semiBoldFont,
+    },
+    pickMeta: {
+      color: theme.mutedForegroundColor,
+      fontFamily: theme.regularFont,
+    },
+    pickRankBadge: {
+      width: 28,
+      height: 28,
     },
   })

@@ -14,8 +14,8 @@ import type { BadgeVectorIconProps } from './BadgeVectorIcon'
 import { BadgeVectorIcon } from './BadgeVectorIcon'
 
 const CYCLE_MS = 16_000
-const ROTATE_DEG = 4
-const PULSE_AMOUNT = 0.032
+const ROTATE_DEG = 3
+const PULSE_AMOUNT = 0.02
 
 function phaseDelayMs(badgeId: BadgeId): number {
   let h = 0

@@ -1,15 +1,7 @@
 import { useCallback, useContext, useEffect, useMemo, useState } from 'react'
-import {
-  ActivityIndicator,
-  Image,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native'
+import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { useFocusEffect } from '@react-navigation/native'
-import { AppIcon, ToolbarRow } from '../components'
+import { AppIcon, RainSpinner, RemoteImage, ToolbarRow } from '../components'
 import { rowGrow } from '../components/layout/PressableRow'
 import { BRAND } from '../constants/brandColors'
 import { ThemeContext } from '../context'
@@ -114,7 +106,7 @@ export function PlayerSearch({ navigation }: { navigation: any }) {
 
         {error ? <Text style={styles.errorText}>{error}</Text> : null}
         {hint ? <Text style={styles.hintText}>{hint}</Text> : null}
-        {loading ? <ActivityIndicator color={theme.tintColor} style={styles.loader} /> : null}
+        {loading ? <RainSpinner size={22} color={theme.tintColor} style={styles.loader} /> : null}
 
         {!loading &&
           players.map((player, index) => {
@@ -130,7 +122,19 @@ export function PlayerSearch({ navigation }: { navigation: any }) {
                 <Surface style={[styles.card, index === 0 && query.trim().length >= 2 ? styles.cardFeatured : null]} padding="lg">
                   <ToolbarRow>
                     {player.profileImageUrl ? (
-                      <Image source={{ uri: player.profileImageUrl }} style={styles.avatar} />
+                      <RemoteImage
+                        uri={player.profileImageUrl}
+                        style={styles.avatar}
+                        spinnerSize={16}
+                        spinnerColor={theme.tintColor}
+                        fallback={
+                          <View style={styles.avatarFallback}>
+                            <Text style={styles.avatarInitial}>
+                              {player.name.charAt(0).toUpperCase()}
+                            </Text>
+                          </View>
+                        }
+                      />
                     ) : (
                       <View style={styles.avatarFallback}>
                         <Text style={styles.avatarInitial}>{player.name.charAt(0).toUpperCase()}</Text>

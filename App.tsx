@@ -10,6 +10,7 @@ import { IMAGE_MODELS, MODELS } from './constants'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { ChatModelModal } from './src/components/index'
 import { Model, User } from './types'
+import type { SetStateAction } from 'react'
 import { clearAdminPass, hydrateAdminPass } from './src/adminSession'
 import { ActionSheetProvider } from '@expo/react-native-action-sheet'
 import AsyncStorage from '@react-native-async-storage/async-storage'
@@ -107,14 +108,17 @@ export default function App() {
     AsyncStorage.setItem('rnai-theme', theme)
   }
 
-  function _setCurrentUser(user: User | null) {
-    setCurrentUser(user)
-    if (user) {
-      AsyncStorage.setItem('rnai-currentUser', JSON.stringify(user))
-    } else {
-      AsyncStorage.removeItem('rnai-currentUser')
-      clearAdminPass()
-    }
+  function _setCurrentUser(value: SetStateAction<User | null>) {
+    setCurrentUser((prev) => {
+      const next = typeof value === 'function' ? value(prev) : value
+      if (next) {
+        AsyncStorage.setItem('rnai-currentUser', JSON.stringify(next))
+      } else {
+        AsyncStorage.removeItem('rnai-currentUser')
+        clearAdminPass()
+      }
+      return next
+    })
   }
 
   const bottomSheetStyles = getBottomsheetStyles(getTheme(theme))

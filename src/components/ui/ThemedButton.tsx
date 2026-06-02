@@ -14,6 +14,9 @@ interface ThemedButtonProps {
   style?: StyleProp<ViewStyle>
   leftIcon?: ReactNode
   disabled?: boolean
+  size?: 'default' | 'sm' | 'lg'
+  /** When false, button sizes to label instead of stretching full width. */
+  fullWidth?: boolean
   /** Gradient accent rim — off by default; use standard bordered black fill. */
   premiumRim?: boolean
 }
@@ -34,6 +37,8 @@ export function ThemedButton({
   style,
   leftIcon,
   disabled,
+  size = 'default',
+  fullWidth = true,
   premiumRim = false,
 }: ThemedButtonProps) {
   const { theme } = useContext(ThemeContext)
@@ -44,8 +49,10 @@ export function ThemedButton({
       onPress={onPress}
       disabled={disabled}
       variant={premiumRim ? 'ghost' : buttonVariant}
+      size={size}
       className={cn(
-        'w-full border-border bg-card',
+        fullWidth ? 'w-full' : 'w-auto shrink-0',
+        'border-border bg-card',
         premiumRim && 'border-0 bg-transparent shadow-none'
       )}
       style={!premiumRim ? style : undefined}

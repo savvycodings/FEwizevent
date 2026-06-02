@@ -28,6 +28,7 @@ import {
   BadgesCatalog,
   AttendedEvents,
   PlayerSearch,
+  SeasonLeaderboardScreen,
 } from './screens'
 import { AppIcon } from './components/ui/app-icon'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -191,6 +192,22 @@ function Tabs() {
           headerShown: true,
           header: ({ navigation }) => (
             <TopHeader title="Find players" showBack onBack={() => navigation.goBack()} />
+          ),
+          tabBarButton: () => null,
+          tabBarItemStyle: { display: 'none' },
+        }}
+      />
+      <Tab.Screen
+        name="SeasonLeaderboard"
+        component={SeasonLeaderboardScreen}
+        options={{
+          headerShown: true,
+          header: ({ navigation }) => (
+            <TopHeader
+              title="Season ladder"
+              showBack
+              onBack={() => navigation.navigate('PlayTab')}
+            />
           ),
           tabBarButton: () => null,
           tabBarItemStyle: { display: 'none' },

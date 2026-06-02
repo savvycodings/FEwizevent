@@ -33,8 +33,10 @@ export function RankSummaryRow({
       </View>
       {trailingValue != null ? (
         <View style={styles.trailing}>
-          <Text className="text-xl font-bold text-primary">{trailingValue}</Text>
-          <Text variant="muted" className="text-xs">
+          <Text className="text-xl font-bold text-primary" style={styles.trailingValue}>
+            {trailingValue}
+          </Text>
+          <Text variant="muted" className="text-xs" style={styles.trailingLabel}>
             {trailingLabel}
           </Text>
         </View>
@@ -54,6 +56,16 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   trailing: {
-    alignItems: 'flex-end',
+    alignItems: 'center',
+    minWidth: 56,
+  },
+  trailingValue: {
+    alignSelf: 'stretch',
+    textAlign: 'center',
+  },
+  trailingLabel: {
+    alignSelf: 'stretch',
+    textAlign: 'center',
+    marginTop: 2,
   },
 })

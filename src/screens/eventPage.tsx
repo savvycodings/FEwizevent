@@ -22,6 +22,7 @@ import {
   Divider,
   LostToCell,
   type LossOpponent,
+  RainSpinner,
   Section,
   Surface,
   Text as UiText,
@@ -322,9 +323,7 @@ export function EventPage() {
           compactTopSpacing
         >
           {loading ? (
-            <ThemedCard style={styles.emptyCard}>
-              <UiText variant="muted">Loading leaderboard...</UiText>
-            </ThemedCard>
+            <RainSpinner size={24} color={theme.tintColor} style={styles.loader} />
           ) : leaderboard.length > 0 ? (
             <ScrollView horizontal showsHorizontalScrollIndicator nestedScrollEnabled>
               <View style={[styles.tableInner, { minWidth: tableMinWidth }]}>
@@ -571,6 +570,9 @@ const getStyles = (theme: any) =>
     emptyCard: {
       alignItems: 'stretch',
       justifyContent: 'center',
+      paddingVertical: SPACING.xl,
+    },
+    loader: {
       paddingVertical: SPACING.xl,
     },
     emptyText: {

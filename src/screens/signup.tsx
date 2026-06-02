@@ -23,6 +23,7 @@ export function Signup() {
   const [profileImage, setProfileImage] = useState<any>(null)
   const [homeStore, setHomeStore] = useState<HomeStore>('glendower')
   const [deckId, setDeckId] = useState<string | null>(null)
+  const [popId, setPopId] = useState('')
   const [loading, setLoading] = useState(false)
 
   async function pickProfileImage() {
@@ -53,8 +54,12 @@ export function Signup() {
   }
 
   async function onSignup() {
-    if (!name.trim() || !email.trim() || !password || !deckId) {
-      Alert.alert('Missing fields', 'Name, email, password, home store, and deck are required.')
+    const popTrim = popId.trim()
+    if (!name.trim() || !email.trim() || !password || !deckId || !/^\d{5,10}$/.test(popTrim)) {
+      Alert.alert(
+        'Missing fields',
+        'Name, email, password, Player ID (5–10 digits), home store, and deck are required.'
+      )
       return
     }
     try {
@@ -69,6 +74,7 @@ export function Signup() {
           profileImageUrl,
           homeStore,
           deckId,
+          popId: popTrim,
         }),
       })
       setCurrentUser(result.user)
@@ -103,6 +109,18 @@ export function Signup() {
             value={name}
             onChangeText={setName}
           />
+          <TextInput
+            style={styles.input}
+            placeholder="Player ID (POP / TCG Live)"
+            placeholderTextColor={theme.mutedForegroundColor}
+            keyboardType="number-pad"
+            maxLength={10}
+            value={popId}
+            onChangeText={setPopId}
+          />
+          <Text style={styles.popHint}>
+            Same number as in tournament files (userid). Used when importing pairings from TDF.
+          </Text>
           <TextInput
             style={styles.input}
             placeholder="Email"
@@ -203,6 +221,14 @@ const getStyles = (theme: any) =>
       fontSize: TYPOGRAPHY.bodySmall,
       marginTop: SPACING.sm,
       marginBottom: SPACING.xs,
+    },
+    popHint: {
+      color: theme.mutedForegroundColor,
+      fontFamily: theme.regularFont,
+      fontSize: TYPOGRAPHY.caption,
+      lineHeight: TYPOGRAPHY.caption * 1.4,
+      marginTop: -SPACING.sm,
+      marginBottom: SPACING.md,
     },
     storeHint: {
       color: theme.mutedForegroundColor,

@@ -5,7 +5,6 @@ import {
   KeyboardAvoidingView,
   StyleSheet,
   ScrollView,
-  ActivityIndicator,
   TextInput,
   Dimensions,
   Keyboard,
@@ -15,6 +14,7 @@ import { useState, useRef, useContext } from 'react'
 import { DOMAIN, IMAGE_MODELS } from '../../constants'
 import { v4 as uuid } from 'uuid'
 import { ThemeContext, AppContext } from '../context'
+import { RainSpinner } from '../components'
 import Ionicons from '@expo/vector-icons/Ionicons'
 import MaterialIcons from '@expo/vector-icons/MaterialCommunityIcons'
 import { useActionSheet } from '@expo/react-native-action-sheet'
@@ -372,7 +372,7 @@ export function Images() {
           }
           { loading && (
             <View style={styles.loadingContainer}>
-              <ActivityIndicator />
+              <RainSpinner size={24} color={theme.tintColor} />
             </View>
           ) }
         </ScrollView>

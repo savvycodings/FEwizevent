@@ -66,25 +66,8 @@ export const playEvents = [
 
 export const menuGroups = [
   {
-    id: 'shortcuts',
-    title: 'Your Shortcuts',
-    items: [{ id: 'resources', title: 'Resources' }, { id: 'card-search', title: 'Card Search' }],
-  },
-  {
     id: 'settings',
     title: 'Settings',
-    items: [
-      { id: 'account', title: 'Account Management' },
-      { id: 'language', title: 'App Language' },
-      { id: 'theme', title: 'Theme' },
-    ],
-  },
-  {
-    id: 'about',
-    title: 'About',
-    items: [
-      { id: 'support', title: 'Customer Service' },
-      { id: 'legal', title: 'Legal Information / Notices' },
-    ],
+    items: [{ id: 'account', title: 'Account Management' }],
   },
 ]

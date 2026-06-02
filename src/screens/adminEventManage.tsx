@@ -1,6 +1,8 @@
 import { useCallback, useContext, useMemo, useState } from 'react'
+import * as DocumentPicker from 'expo-document-picker'
 import {
   Alert,
+  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -12,9 +14,9 @@ import {
 import { useFocusEffect, useRoute } from '@react-navigation/native'
 import {
   BadgeVectorIcon,
+  ConnectedTabPills,
   Input,
   SearchField,
-  SegmentedTabs,
   ThemedButton,
   ThemedCard,
 } from '../components'
@@ -29,7 +31,6 @@ import {
   type EventTier,
 } from '../constants/eventTiers'
 import {
-  JUDGED_AWARD_CRITERIA,
   JUDGED_AWARD_LABEL,
   JUDGED_AWARD_TYPES,
   type JudgedAwardType,
@@ -121,7 +122,9 @@ export function AdminEventManage({ navigation }: { navigation: any }) {
   const [roundsInput, setRoundsInput] = useState('')
   const [useMatchTracking, setUseMatchTracking] = useState(false)
   const [savingJudge, setSavingJudge] = useState(false)
+  const [importingTdf, setImportingTdf] = useState(false)
   const [savingAward, setSavingAward] = useState<JudgedAwardType | null>(null)
+  const [awardPickerFor, setAwardPickerFor] = useState<JudgedAwardType | null>(null)
 
   const duplicatePlacements = useMemo(() => {
     const counts = new Map<number, number>()
@@ -250,6 +253,11 @@ export function AdminEventManage({ navigation }: { navigation: any }) {
     }
   }
 
+  async function chooseJudgedWinner(awardType: JudgedAwardType, userId: number) {
+    await setJudgedWinner(awardType, userId)
+    setAwardPickerFor(null)
+  }
+
   async function toggleManualBadge(badgeId: ManualBadgeId) {
     if (!selectedUserId) return
     const already = earnedBadges.some((b) => b.badgeId === badgeId)
@@ -263,6 +271,57 @@ export function AdminEventManage({ navigation }: { navigation: any }) {
       await loadBadgesForUser(selectedUserId)
     } catch (err: unknown) {
       Alert.alert('Badge failed', err instanceof Error ? err.message : 'Try again')
+    }
+  }
+
+  async function pickAndImportTdf() {
+    try {
+      const picked = await DocumentPicker.getDocumentAsync({
+        type: ['text/xml', 'application/xml', '*/*'],
+        copyToCacheDirectory: true,
+      })
+      if (picked.canceled || !picked.assets?.[0]) return
+      const asset = picked.assets[0]
+      const fileName = asset.name || 'import.tdf'
+      setImportingTdf(true)
+      const fileRes = await fetch(asset.uri)
+      const xml = await fileRes.text()
+      const res = await apiRequest<{
+        fileKind: string
+        roundNumber: number | null
+        attendanceMarked: number
+        pairingsImported: number
+        resultsImported: number
+        placementsSet: number
+        unknownPopIds: string[]
+        skippedMatches: number
+      }>(`/admin/events/${eventId}/import-tdf`, {
+        method: 'POST',
+        body: JSON.stringify({ xml, fileName }),
+      })
+      await load()
+      const lines = [
+        `File: ${fileName}`,
+        `Type: ${res.fileKind}${res.roundNumber != null ? ` (round ${res.roundNumber})` : ''}`,
+      ]
+      if (res.attendanceMarked) lines.push(`Attendance: ${res.attendanceMarked} players`)
+      if (res.pairingsImported) lines.push(`Pairings: ${res.pairingsImported} matches`)
+      if (res.resultsImported) lines.push(`Results: ${res.resultsImported} matches`)
+      if (res.placementsSet) lines.push(`Placements: ${res.placementsSet}`)
+      if (res.skippedMatches) lines.push(`Skipped: ${res.skippedMatches} matches`)
+      if (res.unknownPopIds?.length) {
+        lines.push(
+          `Unknown Player IDs (add on signup): ${res.unknownPopIds.slice(0, 8).join(', ')}${
+            res.unknownPopIds.length > 8 ? '…' : ''
+          }`
+        )
+      }
+      lines.push('Deck is still set manually per player.')
+      Alert.alert('TDF imported', lines.join('\n'))
+    } catch (err: unknown) {
+      Alert.alert('Import failed', err instanceof Error ? err.message : 'Try again')
+    } finally {
+      setImportingTdf(false)
     }
   }
 
@@ -301,6 +360,7 @@ export function AdminEventManage({ navigation }: { navigation: any }) {
       : Math.min(99, Math.max(0, Math.floor(Number(roundsInput))))
 
   return (
+    <>
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
       <View style={styles.hero} />
       <View style={styles.surface}>
@@ -314,8 +374,8 @@ export function AdminEventManage({ navigation }: { navigation: any }) {
           </Text>
         </ThemedCard>
 
-        <SegmentedTabs<ManageTab>
-          style={styles.tabRow}
+        <ConnectedTabPills<ManageTab>
+          style={styles.tabPillsRow}
           value={tab}
           onChange={setTab}
           options={[
@@ -324,22 +384,17 @@ export function AdminEventManage({ navigation }: { navigation: any }) {
             { value: 'awards', label: 'Awards' },
             { value: 'settings', label: 'Setup' },
           ]}
+          accessibilityLabelPrefix="Open"
         />
 
         {tab === 'players' ? (
           <>
-            <Text style={styles.sectionHint}>
-              Mark attendance, set deck, and enter placement without opening each player.
-            </Text>
             <SearchField
               value={searchQuery}
               onChangeText={setSearchQuery}
               placeholder="Search players"
               containerClassName="mb-3 rounded-lg border border-border bg-card px-3"
             />
-            {duplicatePlacements.size > 0 ? (
-              <Text style={styles.warnText}>Duplicate placements — fix ranks on the board tab.</Text>
-            ) : null}
             {filteredPlacements.map((row) => {
               const placeNum =
                 row.placement == null || row.placement < 1 ? null : Number(row.placement)
@@ -434,16 +489,12 @@ export function AdminEventManage({ navigation }: { navigation: any }) {
 
         {tab === 'awards' ? (
           <>
-            <Text style={styles.sectionHint}>
-              Two judged awards per event (+{judgedBonusXp} XP each, tier multiplier applied). One
-              winner each.
-            </Text>
             {JUDGED_AWARD_TYPES.map((awardType) => {
               const award =
                 judgedAwards.find((a) => a.awardType === awardType) ?? {
                   awardType,
                   label: JUDGED_AWARD_LABEL[awardType],
-                  criteria: JUDGED_AWARD_CRITERIA[awardType],
+                  criteria: '',
                   userId: null,
                   userName: null,
                   bonusXp: judgedBonusXp,
@@ -451,51 +502,38 @@ export function AdminEventManage({ navigation }: { navigation: any }) {
               return (
                 <ThemedCard key={awardType} style={styles.awardCard}>
                   <Text style={styles.awardTitle}>{award.label}</Text>
-                  <Text style={styles.awardCriteria}>{award.criteria}</Text>
-                  <Text style={styles.awardXp}>+{award.bonusXp} XP</Text>
                   {award.userName ? (
-                    <Text style={styles.awardWinner}>Winner: {award.userName}</Text>
+                    <Text style={styles.awardWinner}>
+                      Winner: {award.userName}
+                      <Text style={styles.awardWinnerXp}>  · +{award.bonusXp} XP</Text>
+                    </Text>
                   ) : (
-                    <Text style={styles.muted}>No winner yet</Text>
+                    <Text style={styles.muted}>
+                      No winner yet
+                      <Text style={styles.awardWinnerXp}>  · +{award.bonusXp} XP</Text>
+                    </Text>
                   )}
-                  <Text style={styles.awardPickLabel}>Select winner (attended)</Text>
-                  <View style={styles.awardPicker}>
-                    {attendedPlayers.map((p) => {
-                      const selected = award.userId === p.userId
-                      return (
-                        <Pressable
-                          key={p.userId}
-                          disabled={savingAward === awardType}
-                          onPress={() =>
-                            setJudgedWinner(awardType, selected ? null : p.userId)
-                          }
-                          style={({ pressed }) => [
-                            styles.awardPill,
-                            selected && styles.awardPillSelected,
-                            pressed && styles.awardPillPressed,
-                          ]}
-                        >
-                          <Text
-                            style={[
-                              styles.awardPillText,
-                              selected && styles.awardPillTextSelected,
-                            ]}
-                            numberOfLines={1}
-                          >
-                            {p.userName}
-                          </Text>
-                        </Pressable>
-                      )
-                    })}
+                  <View style={styles.awardActionRow}>
+                    <ThemedButton
+                      label={savingAward === awardType ? 'Saving…' : 'Select winner'}
+                      onPress={() => setAwardPickerFor(awardType)}
+                      disabled={attendedPlayers.length === 0 || savingAward === awardType}
+                    />
+                    {award.userId ? (
+                      <ThemedButton
+                        label={savingAward === awardType ? 'Saving…' : 'Clear winner'}
+                        variant="outline"
+                        onPress={() => setJudgedWinner(awardType, null)}
+                        disabled={savingAward === awardType}
+                      />
+                    ) : null}
                   </View>
-                  {attendedPlayers.length === 0 ? (
-                    <Text style={styles.muted}>Mark players attended first.</Text>
-                  ) : null}
+                  {attendedPlayers.length === 0 ? <Text style={styles.muted}>Mark players attended first.</Text> : null}
                 </ThemedCard>
               )
             })}
 
-            <Text style={[styles.sectionHint, styles.sectionHintSpaced]}>Manual badges (per player)</Text>
+            <Text style={styles.manualBadgesHeading}>Manual badges</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.userChips}>
               {placements.map((p) => (
                 <Pressable
@@ -555,10 +593,6 @@ export function AdminEventManage({ navigation }: { navigation: any }) {
         {tab === 'settings' ? (
           <ThemedCard style={styles.settingsCard}>
             <Text style={styles.settingsTitle}>Tournament rounds</Text>
-            <Text style={styles.sectionHint}>
-              Match tracking for W / L / Draw per round. Players must be marked attended.
-            </Text>
-            <Text style={styles.inputLabel}>Scheduled rounds</Text>
             <TextInput
               value={roundsInput}
               onChangeText={setRoundsInput}
@@ -571,22 +605,81 @@ export function AdminEventManage({ navigation }: { navigation: any }) {
               <Text style={styles.switchLabel}>Enable match tracking</Text>
               <Switch value={useMatchTracking} onValueChange={setUseMatchTracking} />
             </View>
-            <ThemedButton
-              label={savingJudge ? 'Saving…' : 'Save settings'}
-              onPress={() => saveJudgeSettings().catch(() => {})}
-              disabled={savingJudge}
-            />
-            {useMatchTracking && scheduledRoundsCount > 0 ? (
+            <View style={styles.settingsActions}>
               <ThemedButton
-                label="Open round board"
-                variant="outline"
-                onPress={() => navigation.navigate('AdminRoundBoard', { event })}
+                label={savingJudge ? 'Saving…' : 'Save settings'}
+                onPress={() => saveJudgeSettings().catch(() => {})}
+                disabled={savingJudge}
               />
-            ) : null}
+              {useMatchTracking && scheduledRoundsCount > 0 ? (
+                <ThemedButton
+                  label="Open round board"
+                  variant="outline"
+                  onPress={() => navigation.navigate('AdminRoundBoard', { event })}
+                />
+              ) : null}
+            </View>
+
+            <Text style={[styles.settingsTitle, styles.tdfSectionTitle]}>Import TDF</Text>
+            <ThemedButton
+              label={importingTdf ? 'Importing…' : 'Choose .tdf file'}
+              variant="outline"
+              onPress={() => pickAndImportTdf().catch(() => {})}
+              disabled={importingTdf}
+            />
           </ThemedCard>
         ) : null}
       </View>
     </ScrollView>
+
+      <Modal
+        visible={!!awardPickerFor}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setAwardPickerFor(null)}
+      >
+        <Pressable style={styles.awardModalBackdrop} onPress={() => setAwardPickerFor(null)}>
+          <Pressable style={styles.awardModalCard} onPress={(e) => e.stopPropagation()}>
+            <Text style={styles.awardModalTitle}>
+              Select {awardPickerFor ? JUDGED_AWARD_LABEL[awardPickerFor] : 'winner'}
+            </Text>
+
+            <ScrollView style={styles.awardModalList} keyboardShouldPersistTaps="handled">
+              {attendedPlayers.map((p) => {
+                const selectedAward = awardPickerFor
+                  ? judgedAwards.find((a) => a.awardType === awardPickerFor)
+                  : null
+                const selected = selectedAward?.userId === p.userId
+                return (
+                  <Pressable
+                    key={`pick-${p.userId}`}
+                    onPress={() => {
+                      if (awardPickerFor) chooseJudgedWinner(awardPickerFor, p.userId).catch(() => {})
+                    }}
+                    style={({ pressed }) => [
+                      styles.awardPickRow,
+                      pressed && styles.awardPickRowPressed,
+                    ]}
+                    disabled={!awardPickerFor || !!savingAward}
+                  >
+                    <View style={[styles.awardPickPill, selected && styles.awardPickPillSelected]}>
+                      <Text
+                        style={[styles.awardPickName, selected && styles.awardPickNameSelected]}
+                        numberOfLines={1}
+                      >
+                        {p.userName}
+                      </Text>
+                    </View>
+                  </Pressable>
+                )
+              })}
+            </ScrollView>
+
+            <ThemedButton label="Close" variant="outline" onPress={() => setAwardPickerFor(null)} />
+          </Pressable>
+        </Pressable>
+      </Modal>
+    </>
   )
 }
 
@@ -618,7 +711,9 @@ const getStyles = (theme: any) =>
       fontFamily: theme.regularFont,
       fontSize: TYPOGRAPHY.bodySmall,
     },
-    tabRow: { marginBottom: SPACING.md },
+    tabPillsRow: {
+      marginBottom: SPACING.md,
+    },
     sectionHint: {
       color: theme.mutedForegroundColor,
       fontFamily: theme.regularFont,
@@ -723,17 +818,15 @@ const getStyles = (theme: any) =>
       fontFamily: theme.regularFont,
       fontSize: TYPOGRAPHY.caption,
     },
-    awardCard: { marginBottom: SPACING.md, gap: SPACING.xs },
+    awardCard: {
+      marginBottom: SPACING.md,
+      gap: SPACING.xs,
+      paddingTop: SPACING.sm,
+    },
     awardTitle: {
       color: theme.textColor,
       fontFamily: theme.boldFont,
-      fontSize: TYPOGRAPHY.body,
-    },
-    awardCriteria: {
-      color: theme.mutedForegroundColor,
-      fontFamily: theme.regularFont,
-      fontSize: TYPOGRAPHY.caption,
-      lineHeight: TYPOGRAPHY.caption * 1.4,
+      fontSize: TYPOGRAPHY.h4,
     },
     awardXp: {
       color: theme.tintColor,
@@ -745,61 +838,115 @@ const getStyles = (theme: any) =>
       fontFamily: theme.mediumFont,
       fontSize: TYPOGRAPHY.bodySmall,
     },
-    awardPickLabel: {
-      marginTop: SPACING.sm,
-      color: theme.textColor,
+    awardWinnerXp: {
+      color: theme.tintColor,
       fontFamily: theme.semiBoldFont,
-      fontSize: TYPOGRAPHY.caption,
+      fontSize: TYPOGRAPHY.bodySmall,
     },
-    awardPicker: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-      gap: SPACING.xs,
-      marginTop: SPACING.xs,
+    awardActionRow: {
+      marginTop: SPACING.sm,
+      gap: SPACING.sm,
     },
-    awardPill: {
+    awardModalBackdrop: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.55)',
+      justifyContent: 'center',
+      padding: SPACING.containerPadding,
+    },
+    awardModalCard: {
+      backgroundColor: theme.cardBackground ?? theme.backgroundColor,
+      borderRadius: RADIUS.lg,
+      padding: SPACING.lg,
       borderWidth: 1.5,
       borderColor: theme.borderColor,
-      borderRadius: RADIUS.full,
+      maxHeight: '80%',
+    },
+    awardModalTitle: {
+      color: theme.textColor,
+      fontFamily: theme.boldFont,
+      fontSize: TYPOGRAPHY.h2,
+      textAlign: 'center',
+      marginBottom: SPACING.md,
+    },
+    awardModalList: {
+      maxHeight: 300,
+      marginBottom: SPACING.sm,
+    },
+    awardPickRow: {
+      borderWidth: 1,
+      borderColor: theme.borderColor,
+      borderRadius: RADIUS.md,
+      backgroundColor: theme.backgroundColor,
+      paddingHorizontal: SPACING.md,
+      paddingVertical: SPACING.sm,
+      marginBottom: SPACING.sm,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: SPACING.sm,
+    },
+    awardPickRowPressed: {
+      opacity: 0.9,
+    },
+    awardPickPill: {
       paddingHorizontal: SPACING.md,
       paddingVertical: SPACING.xs,
-      maxWidth: '48%',
-      backgroundColor: theme.cardBackground ?? theme.backgroundColor,
+      borderRadius: RADIUS.full,
+      backgroundColor: 'transparent',
+      alignSelf: 'center',
+      flexGrow: 0,
+      flexShrink: 1,
     },
-    awardPillSelected: {
-      borderColor: theme.tintColor,
-      backgroundColor: `${theme.tintColor}18`,
+    awardPickPillSelected: {
+      backgroundColor: theme.tintColor,
     },
-    awardPillPressed: { opacity: 0.88 },
-    awardPillText: {
+    awardPickName: {
       color: theme.textColor,
       fontFamily: theme.mediumFont,
-      fontSize: TYPOGRAPHY.caption,
+      fontSize: TYPOGRAPHY.body,
+      textAlign: 'center',
     },
-    awardPillTextSelected: { color: theme.tintColor },
-    userChips: { marginBottom: SPACING.md, maxHeight: 44 },
+    awardPickNameSelected: {
+      color: '#000',
+      fontFamily: theme.semiBoldFont,
+    },
+    manualBadgesHeading: {
+      marginTop: SPACING.sm,
+      marginBottom: SPACING.sm,
+      color: theme.textColor,
+      fontFamily: theme.boldFont,
+      fontSize: TYPOGRAPHY.h4,
+    },
+    userChips: {
+      marginBottom: SPACING.md,
+      maxHeight: 44,
+    },
     userChip: {
       borderWidth: 1.5,
       borderColor: theme.borderColor,
       borderRadius: RADIUS.full,
       paddingHorizontal: SPACING.md,
       paddingVertical: SPACING.xs,
-      marginRight: SPACING.xs,
-      maxWidth: 140,
+      marginRight: SPACING.sm,
+      maxWidth: 160,
       backgroundColor: theme.cardBackground ?? theme.backgroundColor,
     },
     userChipSelected: {
-      borderColor: theme.tintColor,
-      backgroundColor: `${theme.tintColor}18`,
+      borderWidth: 0,
+      borderColor: 'transparent',
+      backgroundColor: theme.tintColor,
     },
     userChipText: {
       color: theme.textColor,
       fontFamily: theme.mediumFont,
       fontSize: TYPOGRAPHY.caption,
     },
-    userChipTextSelected: { color: theme.tintColor },
-    badgesCard: { gap: SPACING.sm },
+    userChipTextSelected: { color: '#000' },
+    badgesCard: { gap: 0 },
     badgeFor: {
+      // ThemedCard adds internal padding; pull title up slightly to balance top/bottom spacing.
+      marginTop: -SPACING.sm,
+      marginBottom: SPACING.sm,
       color: theme.textColor,
       fontFamily: theme.semiBoldFont,
       fontSize: TYPOGRAPHY.bodySmall,
@@ -828,10 +975,19 @@ const getStyles = (theme: any) =>
       textAlign: 'center',
     },
     settingsCard: { gap: SPACING.sm },
+    settingsActions: {
+      gap: SPACING.lg,
+      marginTop: SPACING.xs,
+    },
     settingsTitle: {
       color: theme.textColor,
       fontFamily: theme.semiBoldFont,
       fontSize: TYPOGRAPHY.body,
+      marginBottom: SPACING.md,
+    },
+    tdfSectionTitle: {
+      marginTop: SPACING.lg,
+      marginBottom: SPACING.md,
     },
     inputLabel: {
       color: theme.mutedForegroundColor,

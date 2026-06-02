@@ -1,21 +1,19 @@
 import { useCallback, useContext, useEffect, useState } from 'react'
 import {
   Pressable,
-  ScrollView,
   StyleProp,
   StyleSheet,
   Text,
   TextStyle,
   View,
-  useWindowDimensions,
 } from 'react-native'
 import { useFocusEffect, useNavigation } from '@react-navigation/native'
 import MaskedView from '@react-native-masked-view/masked-view'
 import { LinearGradient } from 'expo-linear-gradient'
 import { AppContext, ThemeContext } from '../../context'
-import { DeckLabel, Divider, SegmentedTabs, ThemedCard, Text as UiText } from '../index'
+import { DeckLabel, Divider, RainSpinner, ThemedCard, Text as UiText } from '../index'
 import { HOME_STORE_LABEL, type HomeStore } from '../../constants/stores'
-import { SPACING, TYPOGRAPHY } from '../../constants/layout'
+import { RADIUS, SPACING, TYPOGRAPHY } from '../../constants/layout'
 import { apiRequest } from '../../api'
 
 type LeaderboardRow = {
@@ -40,16 +38,17 @@ type SeasonLeaderboardProps = {
   /** Combined ladder (everyone) or store teams (Glendower / Rosebank tabs only). */
   mode: SeasonLeaderboardMode
   initialStore?: HomeStore
+  /** When set, only the first N rows are shown (e.g. Play tab preview). */
+  limit?: number
+  /** Filters rows by player name (case-insensitive). */
+  searchQuery?: string
 }
 
 const COL = {
-  place: 44,
-  player: 156,
-  deck: 140,
-  xp: 72,
+  place: 34,
+  player: 118,
+  deck: 112,
 }
-
-const TABLE_MIN_WIDTH = COL.place + COL.player + COL.deck + COL.xp + SPACING.xs * 3
 
 const MEDAL_GRADIENTS: Record<1 | 2 | 3, [string, string, string]> = {
   1: ['#FFF5C2', '#FFD24A', '#B88300'],
@@ -88,13 +87,16 @@ function deckDisplay(label: string | null | undefined): string {
   return label
 }
 
-export function SeasonLeaderboard({ mode, initialStore = 'glendower' }: SeasonLeaderboardProps) {
+export function SeasonLeaderboard({
+  mode,
+  initialStore = 'glendower',
+  limit,
+  searchQuery,
+}: SeasonLeaderboardProps) {
   const { theme } = useContext(ThemeContext)
   const { currentUser } = useContext(AppContext)
   const styles = getStyles(theme)
   const navigation = useNavigation<any>()
-  const { width: windowWidth } = useWindowDimensions()
-  const tableMinWidth = Math.max(TABLE_MIN_WIDTH, windowWidth - SPACING.containerPadding * 2)
 
   const [store, setStore] = useState<HomeStore>(initialStore)
 
@@ -137,20 +139,58 @@ export function SeasonLeaderboard({ mode, initialStore = 'glendower' }: SeasonLe
   )
 
   const rows = payload?.rows ?? []
-  const col = COL
+  const normalizedSearch = searchQuery?.trim().toLowerCase() ?? ''
+  const filteredRows =
+    normalizedSearch.length > 0
+      ? rows.filter((row) => row.name.toLowerCase().includes(normalizedSearch))
+      : rows
+  const visibleRows = limit != null && limit > 0 ? filteredRows.slice(0, limit) : filteredRows
+  const placeForRow = (row: LeaderboardRow) => {
+    const index = rows.findIndex((entry) => entry.id === row.id)
+    return index >= 0 ? index + 1 : 0
+  }
 
   return (
     <View>
       {mode === 'store-teams' ? (
-        <SegmentedTabs<HomeStore>
-          style={styles.tabs}
-          value={store}
-          onChange={setStore}
-          options={[
-            { value: 'glendower', label: 'Glendower' },
-            { value: 'rosebank', label: 'Rosebank' },
-          ]}
-        />
+        <View style={styles.storeTabsRow}>
+          <Pressable
+            onPress={() => setStore('glendower')}
+            style={[
+              styles.storeTabBtn,
+              store === 'glendower' ? styles.storeTabBtnActive : styles.storeTabBtnInactive,
+            ]}
+            accessibilityRole="button"
+            accessibilityLabel="Show Glendower team leaderboard"
+          >
+            <Text
+              style={[
+                styles.storeTabText,
+                store === 'glendower' ? styles.storeTabTextActive : styles.storeTabTextInactive,
+              ]}
+            >
+              Glendower
+            </Text>
+          </Pressable>
+          <Pressable
+            onPress={() => setStore('rosebank')}
+            style={[
+              styles.storeTabBtn,
+              store === 'rosebank' ? styles.storeTabBtnActive : styles.storeTabBtnInactive,
+            ]}
+            accessibilityRole="button"
+            accessibilityLabel="Show Rosebank team leaderboard"
+          >
+            <Text
+              style={[
+                styles.storeTabText,
+                store === 'rosebank' ? styles.storeTabTextActive : styles.storeTabTextInactive,
+              ]}
+            >
+              Rosebank
+            </Text>
+          </Pressable>
+        </View>
       ) : null}
 
       {payload ? (
@@ -185,87 +225,85 @@ export function SeasonLeaderboard({ mode, initialStore = 'glendower' }: SeasonLe
       {error ? <Text style={styles.error}>{error}</Text> : null}
 
       {loading ? (
-        <ThemedCard style={styles.emptyCard}>
-          <UiText variant="muted">Loading leaderboard…</UiText>
-        </ThemedCard>
-      ) : rows.length > 0 ? (
-        <ScrollView horizontal showsHorizontalScrollIndicator nestedScrollEnabled>
-          <View style={[styles.tableInner, { minWidth: tableMinWidth }]}>
-            <View style={styles.tableHeaderRow}>
-              <Text style={[styles.th, { width: col.place }]}>#</Text>
-              <Text style={[styles.th, { width: col.player }]}>Player</Text>
-              <Text style={[styles.th, { width: col.deck }]}>Deck</Text>
-              <Text style={[styles.th, { width: col.xp }]}>XP</Text>
-            </View>
-            <Divider faint spacing="sm" />
-            {rows.map((row, index) => {
-              const place = index + 1
-              const isTop = place <= 3
-              const isYou = currentUser?.id === row.id
-              return (
-                <Pressable
-                  key={row.id}
-                  onPress={() =>
-                    navigation.navigate('PlayerSnapshot', { userId: row.id, userName: row.name })
-                  }
-                  style={({ pressed }) => [
-                    pressed && styles.tableRowPressed,
-                    isYou && styles.tableRowYou,
-                  ]}
-                  accessibilityRole="button"
-                  accessibilityLabel={`View stats for ${row.name}`}
-                >
-                  <View style={styles.tableRow}>
-                    <View style={[styles.tdPlace, { width: col.place }]}>
-                      <MedalGradientText
-                        place={place}
-                        text={`${place}`}
-                        style={[styles.placeText, isTop && styles.topRankPlace]}
-                      />
-                    </View>
-                    <View style={[styles.tdPlayer, { width: col.player }]}>
-                      <MedalGradientText
-                        place={place}
-                        text={row.name}
-                        style={[styles.nameText, isTop && styles.topRankName]}
-                      />
-                      <Text style={styles.rankMicro} numberOfLines={1}>
-                        {row.rank}
-                      </Text>
-                    </View>
-                    <View style={[styles.tdDeckWrap, { width: col.deck }]}>
-                      {row.activeDeckId || deckDisplay(row.activeDeckLabel) !== '—' ? (
-                        <DeckLabel
-                          deckId={row.activeDeckId}
-                          label={row.activeDeckLabel}
-                          iconSize={20}
-                          numberOfLines={2}
-                          textStyle={styles.tdDeckText}
-                          mutedPrefix={false}
-                        />
-                      ) : (
-                        <Text style={styles.tdDeckText}>—</Text>
-                      )}
-                    </View>
-                    <Text style={[styles.tdXp, { width: col.xp }]}>{row.seasonXp}</Text>
-                  </View>
-                  <View style={styles.rowRule} />
-                </Pressable>
-              )
-            })}
+        <RainSpinner size={24} color={theme.tintColor} style={styles.loader} />
+      ) : visibleRows.length > 0 ? (
+        <View style={styles.tableInner}>
+          <View style={styles.tableHeaderRow}>
+            <Text style={[styles.th, { width: COL.place }]}>#</Text>
+            <Text style={[styles.th, { width: COL.player }]}>Player</Text>
+            <Text style={[styles.th, { width: COL.deck }]}>Deck</Text>
+            <Text style={[styles.th, styles.xpHeader]}>XP</Text>
           </View>
-        </ScrollView>
+          <Divider faint spacing="sm" />
+          {visibleRows.map((row) => {
+            const place = placeForRow(row)
+            const isTop = place <= 3
+            const isYou = currentUser?.id === row.id
+            return (
+              <Pressable
+                key={row.id}
+                onPress={() =>
+                  navigation.navigate('PlayerSnapshot', { userId: row.id, userName: row.name })
+                }
+                style={({ pressed }) => [
+                  pressed && styles.tableRowPressed,
+                  isYou && styles.tableRowYou,
+                ]}
+                accessibilityRole="button"
+                accessibilityLabel={`View stats for ${row.name}`}
+              >
+                <View style={styles.tableRow}>
+                  <View style={[styles.tdPlace, { width: COL.place }]}>
+                    <MedalGradientText
+                      place={place}
+                      text={`${place}`}
+                      style={[styles.placeText, isTop && styles.topRankPlace]}
+                    />
+                  </View>
+                  <View style={[styles.tdPlayer, { width: COL.player }]}>
+                    <MedalGradientText
+                      place={place}
+                      text={row.name}
+                      style={[styles.nameText, isTop && styles.topRankName]}
+                    />
+                    <Text style={styles.rankMicro} numberOfLines={1}>
+                      {row.rank}
+                    </Text>
+                  </View>
+                  <View style={[styles.tdDeckWrap, { width: COL.deck }]}>
+                    {row.activeDeckId || deckDisplay(row.activeDeckLabel) !== '—' ? (
+                      <DeckLabel
+                        deckId={row.activeDeckId}
+                        label={row.activeDeckLabel}
+                        iconSize={20}
+                        numberOfLines={2}
+                        textStyle={styles.tdDeckText}
+                        mutedPrefix={false}
+                      />
+                    ) : (
+                      <Text style={styles.tdDeckText}>—</Text>
+                    )}
+                  </View>
+                  <Text style={[styles.tdXp, styles.xpCell]}>{row.seasonXp}</Text>
+                </View>
+                <View style={styles.rowRule} />
+              </Pressable>
+            )
+          })}
+        </View>
       ) : (
         <ThemedCard style={styles.emptyCard}>
           <UiText variant="muted">
-            {mode === 'combined'
-              ? 'No season points yet.'
-              : currentUser?.id &&
-                  currentUser.homeStore !== store &&
-                  (currentUser.homeStore === 'glendower' ||
-                    currentUser.homeStore === 'rosebank')
-                ? `Your home store is ${HOME_STORE_LABEL[currentUser.homeStore]}. Switch tabs or update it in Account Management.`
-                : 'No players at this store yet.'}
+            {normalizedSearch.length > 0
+              ? 'No players match your search.'
+              : mode === 'combined'
+                ? 'No season points yet.'
+                : currentUser?.id &&
+                    currentUser.homeStore !== store &&
+                    (currentUser.homeStore === 'glendower' ||
+                      currentUser.homeStore === 'rosebank')
+                  ? `Your home store is ${HOME_STORE_LABEL[currentUser.homeStore]}. Switch tabs or update it in Account Management.`
+                  : 'No players at this store yet.'}
           </UiText>
         </ThemedCard>
       )}
@@ -275,7 +313,37 @@ export function SeasonLeaderboard({ mode, initialStore = 'glendower' }: SeasonLe
 
 const getStyles = (theme: any) =>
   StyleSheet.create({
-    tabs: { marginBottom: SPACING.sm },
+    storeTabsRow: {
+      marginBottom: SPACING.sm,
+      flexDirection: 'row',
+      gap: SPACING.sm,
+    },
+    storeTabBtn: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      minHeight: 40,
+      borderRadius: RADIUS.full,
+      borderWidth: 1.5,
+    },
+    storeTabBtnActive: {
+      backgroundColor: theme.tintColor,
+      borderColor: theme.tintColor,
+    },
+    storeTabBtnInactive: {
+      backgroundColor: 'transparent',
+      borderColor: theme.borderColor,
+    },
+    storeTabText: {
+      fontFamily: theme.semiBoldFont,
+      fontSize: TYPOGRAPHY.bodySmall,
+    },
+    storeTabTextActive: {
+      color: '#000',
+    },
+    storeTabTextInactive: {
+      color: theme.textColor,
+    },
     seasonNote: {
       color: theme.mutedForegroundColor,
       fontFamily: theme.regularFont,
@@ -324,9 +392,13 @@ const getStyles = (theme: any) =>
       gap: SPACING.xs,
     },
     th: {
-      color: theme.mutedForegroundColor,
-      fontFamily: theme.semiBoldFont,
-      fontSize: TYPOGRAPHY.caption,
+      color: '#fff',
+      fontFamily: theme.boldFont,
+      fontSize: TYPOGRAPHY.bodySmall,
+    },
+    xpHeader: {
+      flex: 1,
+      textAlign: 'right',
     },
     tableRow: {
       flexDirection: 'row',
@@ -387,9 +459,16 @@ const getStyles = (theme: any) =>
       fontSize: TYPOGRAPHY.bodySmall,
       textAlign: 'center',
     },
+    xpCell: {
+      flex: 1,
+      textAlign: 'right',
+    },
     emptyCard: {
       alignItems: 'stretch',
       justifyContent: 'center',
+      paddingVertical: SPACING.xl,
+    },
+    loader: {
       paddingVertical: SPACING.xl,
     },
   })

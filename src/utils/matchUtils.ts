@@ -3,7 +3,7 @@ export type EventMatch = {
   roundNumber: number
   playerAId: number
   playerBId: number
-  outcome: 'a_wins' | 'b_wins' | 'draw'
+  outcome: 'a_wins' | 'b_wins' | 'draw' | 'pending'
   playerAName?: string
   playerBName?: string
 }
@@ -28,6 +28,7 @@ export function opponentNameFromMatch(m: EventMatch, focalId: number): string {
 
 export function focalOutcome(m: EventMatch, focalId: number): 'win' | 'loss' | 'draw' | null {
   if (!m) return null
+  if (m.outcome === 'pending') return null
   if (m.outcome === 'draw') return 'draw'
   if (m.playerAId === focalId) return m.outcome === 'a_wins' ? 'win' : 'loss'
   return m.outcome === 'b_wins' ? 'win' : 'loss'

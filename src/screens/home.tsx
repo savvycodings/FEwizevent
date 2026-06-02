@@ -20,6 +20,7 @@ import {
   FeedEventCard,
   MotionBadgeIcon,
   RankProgressCard,
+  RemoteImage,
   ScreenSurface,
   Section,
   StatTile,
@@ -40,7 +41,8 @@ import { formatRankProgressFooter, xpRemainingToRank } from '../utils/rankProgre
 
 const QR_MODAL_SIZE = 256
 const HOME_BADGE_COLUMNS = 4
-const HOME_BADGE_ICON_SIZE = 36
+const HOME_BADGE_GUTTER = SPACING.sm
+const HOME_BADGE_CELL_PERCENT = `${100 / HOME_BADGE_COLUMNS}%`
 
 interface HomeProps {
   navigation: any
@@ -115,10 +117,10 @@ export function Home({ navigation }: HomeProps) {
   const { currentUser } = useContext(AppContext)
   const insets = useSafeAreaInsets()
   const { width: screenWidth } = useWindowDimensions()
-  const badgeCellWidth = useMemo(() => {
+  const badgeIconSize = useMemo(() => {
     const contentWidth = screenWidth - SPACING.containerPadding * 2
-    const gap = SPACING.sm
-    return Math.floor((contentWidth - gap * (HOME_BADGE_COLUMNS - 1)) / HOME_BADGE_COLUMNS)
+    const tileWidth = contentWidth / HOME_BADGE_COLUMNS - HOME_BADGE_GUTTER
+    return Math.round(Math.max(44, tileWidth * 0.68))
   }, [screenWidth])
   const styles = getStyles(theme)
   const openAttendedEvents = useCallback(() => {
@@ -284,9 +286,21 @@ export function Home({ navigation }: HomeProps) {
         <View style={styles.heroInner}>
         <View style={styles.heroTopRow}>
           <View style={styles.heroIdentityRow}>
-            <View style={styles.avatarRing}>
+            <View>
               {currentUser?.profileImageUrl ? (
-                <Image source={{ uri: currentUser.profileImageUrl }} style={styles.heroAvatar} />
+                <RemoteImage
+                  uri={currentUser.profileImageUrl}
+                  style={styles.heroAvatar}
+                  spinnerSize={20}
+                  spinnerColor={BRAND.heroInk}
+                  fallback={
+                    <View style={styles.heroAvatarFallback}>
+                      <Text style={styles.heroAvatarInitial}>
+                        {displayName.charAt(0).toUpperCase()}
+                      </Text>
+                    </View>
+                  }
+                />
               ) : (
                 <View style={styles.heroAvatarFallback}>
                   <Text style={styles.heroAvatarInitial}>{displayName.charAt(0).toUpperCase()}</Text>
@@ -295,20 +309,33 @@ export function Home({ navigation }: HomeProps) {
             </View>
             <View style={styles.heroTextWrap}>
               <Text style={styles.heroGreeting}>Wizard</Text>
-              <Pressable
-                onPress={() => profileDeepLink && setQrModalVisible(true)}
-                disabled={!profileDeepLink}
-                style={({ pressed }) => [
-                  styles.heroNamePressable,
-                  pressed && profileDeepLink && styles.heroNamePressed,
-                ]}
-                accessibilityRole="button"
-                accessibilityLabel="Show my profile QR code"
-              >
-                <Text style={styles.heroName} numberOfLines={1}>
-                  {displayName}
-                </Text>
-              </Pressable>
+              <View style={styles.heroNameRow}>
+                <Pressable
+                  onPress={() => profileDeepLink && setQrModalVisible(true)}
+                  disabled={!profileDeepLink}
+                  style={({ pressed }) => [
+                    styles.heroNamePressable,
+                    pressed && profileDeepLink && styles.heroNamePressed,
+                  ]}
+                  accessibilityRole="button"
+                  accessibilityLabel="Show my profile QR code"
+                >
+                  <Text style={styles.heroName} numberOfLines={1}>
+                    {displayName}
+                  </Text>
+                </Pressable>
+                {currentUser?.id ? (
+                  <DeckPicker
+                    variant="heroIcon"
+                    value={activeDeckId}
+                    onChange={saveActiveDeck}
+                    label="Current deck"
+                    showFieldLabel={false}
+                    placeholder="Choose deck"
+                    disabled={deckSaving || homeLoading}
+                  />
+                ) : null}
+              </View>
               <View style={styles.heroPills}>
                 <View style={styles.rankPill}>
                   <Image
@@ -320,17 +347,6 @@ export function Home({ navigation }: HomeProps) {
                     {currentRank} · {homeLoading ? '…' : `${currentXp} XP`}
                   </Text>
                 </View>
-                {currentUser?.id ? (
-                  <DeckPicker
-                    variant="hero"
-                    value={activeDeckId}
-                    onChange={saveActiveDeck}
-                    label="Current deck"
-                    showFieldLabel={false}
-                    placeholder="Choose deck"
-                    disabled={deckSaving || homeLoading}
-                  />
-                ) : null}
               </View>
             </View>
           </View>
@@ -414,32 +430,36 @@ export function Home({ navigation }: HomeProps) {
                     new Date(b.awardedAt).getTime() - new Date(a.awardedAt).getTime()
                 )
                 .map((badge, index) => (
-                  <Pressable
+                  <View
                     key={`${badge.badgeId}-${badge.eventId}-${badge.awardedAt}-${index}`}
-                    style={({ pressed }) => [
-                      styles.earnedBadgeTile,
-                      { width: badgeCellWidth },
-                      pressed && styles.earnedBadgePressed,
-                    ]}
-                    onPress={() => setSelectedBadge(badge)}
-                    accessibilityLabel={BADGE_DISPLAY_TITLE[badge.badgeId]}
+                    style={styles.earnedBadgeCell}
                   >
-                    <View style={styles.earnedBadgeIconWrap}>
-                      <MotionBadgeIcon
-                        badgeId={badge.badgeId}
-                        size={HOME_BADGE_ICON_SIZE}
-                        color={theme.tintColor}
-                      />
-                    </View>
-                    <Text style={styles.earnedBadgeTitle} numberOfLines={1}>
-                      {BADGE_DISPLAY_TITLE[badge.badgeId]}
-                    </Text>
-                    {badge.eventTitle ? (
-                      <Text style={styles.earnedBadgeMeta} numberOfLines={1}>
-                        {badge.eventTitle}
+                    <Pressable
+                      style={({ pressed }) => [
+                        styles.earnedBadgeTile,
+                        pressed && styles.earnedBadgePressed,
+                      ]}
+                      onPress={() => setSelectedBadge(badge)}
+                      accessibilityLabel={BADGE_DISPLAY_TITLE[badge.badgeId]}
+                    >
+                      <View
+                        style={[
+                          styles.earnedBadgeIconWrap,
+                          { width: badgeIconSize, height: badgeIconSize },
+                        ]}
+                      >
+                        <MotionBadgeIcon
+                          badgeId={badge.badgeId}
+                          size={badgeIconSize}
+                          color={theme.tintColor}
+                          animate={false}
+                        />
+                      </View>
+                      <Text style={styles.earnedBadgeTitle} numberOfLines={1}>
+                        {BADGE_DISPLAY_TITLE[badge.badgeId]}
                       </Text>
-                    ) : null}
-                  </Pressable>
+                    </Pressable>
+                  </View>
                 ))}
             </View>
           ) : (
@@ -625,6 +645,13 @@ const getStyles = (theme: any) =>
       letterSpacing: 0.8,
       textTransform: 'uppercase',
     },
+    heroNameRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: SPACING.sm,
+      minWidth: 0,
+      marginTop: 2,
+    },
     heroPills: {
       marginTop: SPACING.sm,
       gap: SPACING.xs,
@@ -632,13 +659,6 @@ const getStyles = (theme: any) =>
     },
     heroTextWrap: {
       flex: 1,
-    },
-    avatarRing: {
-      padding: 3,
-      borderRadius: 36,
-      backgroundColor: BRAND.heroRing,
-      borderWidth: 2,
-      borderColor: BRAND.heroBorder,
     },
     heroAvatar: {
       width: 60,
@@ -659,9 +679,9 @@ const getStyles = (theme: any) =>
       fontSize: TYPOGRAPHY.h3,
     },
     heroNamePressable: {
-      alignSelf: 'flex-start',
+      flex: 1,
+      minWidth: 0,
       maxWidth: '100%',
-      marginTop: 2,
     },
     heroNamePressed: {
       opacity: 0.65,
@@ -711,22 +731,27 @@ const getStyles = (theme: any) =>
     earnedBadgesGrid: {
       flexDirection: 'row',
       flexWrap: 'wrap',
-      gap: SPACING.sm,
+      width: '100%',
+      marginHorizontal: -HOME_BADGE_GUTTER / 2,
+    },
+    earnedBadgeCell: {
+      width: HOME_BADGE_CELL_PERCENT,
+      paddingHorizontal: HOME_BADGE_GUTTER / 2,
+      marginBottom: SPACING.lg,
     },
     earnedBadgeTile: {
+      width: '100%',
       borderWidth: 1,
       borderColor: theme.borderColor,
       borderRadius: RADIUS.md,
       backgroundColor: theme.cardBackground,
       paddingHorizontal: SPACING.xs,
-      paddingTop: SPACING.sm,
-      paddingBottom: SPACING.xs,
+      paddingTop: SPACING.md,
+      paddingBottom: SPACING.sm,
       alignItems: 'center',
-      minHeight: 88,
     },
     earnedBadgeIconWrap: {
-      width: HOME_BADGE_ICON_SIZE + 8,
-      height: HOME_BADGE_ICON_SIZE + 8,
+      alignSelf: 'center',
       alignItems: 'center',
       justifyContent: 'center',
       marginBottom: SPACING.xs,
@@ -737,14 +762,7 @@ const getStyles = (theme: any) =>
       color: theme.textColor,
       fontFamily: theme.semiBoldFont,
       fontSize: TYPOGRAPHY.caption,
-    },
-    earnedBadgeMeta: {
-      width: '100%',
-      marginTop: 2,
-      textAlign: 'center',
-      color: theme.mutedForegroundColor,
-      fontFamily: theme.regularFont,
-      fontSize: TYPOGRAPHY.caption - 1,
+      lineHeight: TYPOGRAPHY.caption * 1.2,
     },
     earnedBadgePressed: {
       opacity: 0.88,
@@ -784,7 +802,7 @@ const getStyles = (theme: any) =>
     },
     badgeModalBackdrop: {
       flex: 1,
-      backgroundColor: 'rgba(0,0,0,0.55)',
+      backgroundColor: 'transparent',
       justifyContent: 'center',
       alignItems: 'center',
       paddingHorizontal: SPACING.lg,
@@ -832,7 +850,7 @@ const getStyles = (theme: any) =>
     },
     qrModalBackdrop: {
       flex: 1,
-      backgroundColor: 'rgba(0,0,0,0.65)',
+      backgroundColor: 'transparent',
       justifyContent: 'center',
       alignItems: 'center',
       padding: SPACING.containerPadding,

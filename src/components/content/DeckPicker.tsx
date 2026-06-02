@@ -27,7 +27,8 @@ type DeckPickerProps = {
   placeholder?: string
   /** Profile: inline label + icon, one bordered capsule around the control. */
   /** Hero: compact pill on home header (matches rank pill). */
-  variant?: 'default' | 'profile' | 'hero'
+  /** Hero icon: deck glyph only, inline beside the player name. */
+  variant?: 'default' | 'profile' | 'hero' | 'heroIcon'
   /** Profile deck hint when event deck is not set yet (admin UI only; not saved until picked). */
   suggestedDeckId?: string | null
 }
@@ -50,6 +51,7 @@ export function DeckPicker({
   const modalTitle = label || 'Select deck'
   const isProfile = variant === 'profile'
   const isHero = variant === 'hero'
+  const isHeroIcon = variant === 'heroIcon'
 
   const profileLabel = label.trim().replace(/:+$/, '')
   const suggested = DECK_CATALOG.find((d) => d.id === suggestedDeckId)
@@ -69,11 +71,15 @@ export function DeckPicker({
       onPress={() => setOpen(true)}
       accessibilityRole="button"
       accessibilityLabel={
-        isHero
+        isHeroIcon
           ? selected
             ? `Deck: ${selected.label}. Change deck`
             : placeholder
-          : isProfile
+          : isHero
+            ? selected
+              ? `Deck: ${selected.label}. Change deck`
+              : placeholder
+            : isProfile
             ? selected
               ? `${profileLabel}: ${selected.label}. Change deck`
               : placeholder
@@ -83,17 +89,21 @@ export function DeckPicker({
       }
       accessibilityState={{ expanded: open }}
       style={({ pressed }) => [
-        isHero
+        isHeroIcon
+          ? styles.heroIconTrigger
+          : isHero
           ? styles.heroTrigger
           : isProfile
             ? styles.profileTrigger
             : styles.trigger,
-        !isProfile && !isHero && compact && styles.triggerCompact,
+        !isProfile && !isHero && !isHeroIcon && compact && styles.triggerCompact,
         disabled && styles.triggerDisabled,
         pressed && !disabled && styles.triggerPressed,
       ]}
     >
-      {isHero ? (
+      {isHeroIcon ? (
+        <DeckIcon deckId={value} size={28} />
+      ) : isHero ? (
         <>
           <DeckIcon deckId={value} size={18} />
           <Text style={[rowGrow.text, styles.heroPillText]} numberOfLines={1} ellipsizeMode="tail">
@@ -137,8 +147,8 @@ export function DeckPicker({
 
   return (
     <>
-      <View style={[styles.wrap, compact && styles.wrapCompact, isHero && styles.wrapHero]}>
-        {!isProfile && !isHero && showFieldLabel && !compact ? (
+      <View style={[styles.wrap, compact && styles.wrapCompact, isHero && styles.wrapHero, isHeroIcon && styles.wrapHeroIcon]}>
+        {!isProfile && !isHero && !isHeroIcon && showFieldLabel && !compact ? (
           <Text style={styles.fieldLabel}>{label}</Text>
         ) : null}
         {trigger}
@@ -202,6 +212,25 @@ const getStyles = (theme: any) =>
     wrapHero: {
       width: undefined,
       alignSelf: 'flex-start',
+    },
+    wrapHeroIcon: {
+      width: undefined,
+      alignSelf: 'center',
+      flexShrink: 0,
+    },
+    heroIconTrigger: {
+      width: 44,
+      height: 44,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: RADIUS.full,
+      backgroundColor: 'rgba(0,0,0,0.12)',
+      borderWidth: 0,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.12,
+      shadowRadius: 4,
+      elevation: 3,
     },
     heroTrigger: {
       alignSelf: 'flex-start',
@@ -275,7 +304,7 @@ const getStyles = (theme: any) =>
     backdrop: {
       flex: 1,
       justifyContent: 'flex-end',
-      backgroundColor: 'rgba(0,0,0,0.55)',
+      backgroundColor: 'transparent',
     },
     sheet: {
       maxHeight: '70%',

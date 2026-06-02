@@ -34,7 +34,7 @@ export function ListRowCard({
       className={cn('mb-3 w-full active:opacity-80', className)}
       style={style}
     >
-      <Card className="border py-4">
+      <Card className="border px-4 py-4">
         <ToolbarRow>
           <View style={rowGrow.slot}>
             <Text className="font-semibold" numberOfLines={1}>

@@ -1,7 +1,7 @@
 import { useCallback, useContext, useEffect, useMemo, useState } from 'react'
-import { Alert, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native'
-import { AppIcon, BadgeVectorIcon } from '../components'
+import { AppIcon, BadgeVectorIcon, RemoteImage } from '../components'
 import { ThemeContext } from '../context'
 import { Input, ThemedButton, ThemedCard } from '../components'
 import { DeckPicker } from '../components/content/DeckPicker'
@@ -225,7 +225,19 @@ export function AdminPlayerAttendance() {
         <ThemedCard style={styles.playerCard}>
           <View style={styles.playerHeaderRow}>
             {userProfileImage ? (
-              <Image source={{ uri: userProfileImage }} style={styles.playerAvatar} />
+              <RemoteImage
+                uri={userProfileImage}
+                style={styles.playerAvatar}
+                spinnerSize={18}
+                spinnerColor={theme.tintColor}
+                fallback={
+                  <View style={styles.playerAvatarFallback}>
+                    <Text style={styles.playerAvatarInitial}>
+                      {(user?.name || '?').charAt(0).toUpperCase()}
+                    </Text>
+                  </View>
+                }
+              />
             ) : (
               <View style={styles.playerAvatarFallback}>
                 <Text style={styles.playerAvatarInitial}>{(user?.name || '?').charAt(0).toUpperCase()}</Text>

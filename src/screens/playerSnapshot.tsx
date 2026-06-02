@@ -1,7 +1,7 @@
 import { useCallback, useContext, useState } from 'react'
 import { Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native'
-import { AppIcon } from '../components'
+import { AppIcon, LoadingName, RainSpinner } from '../components'
 import { BRAND } from '../constants/brandColors'
 import { ThemeContext } from '../context'
 import { Divider, Section, Surface, ThemedCard } from '../components'
@@ -109,10 +109,8 @@ export function PlayerSnapshot() {
   )
 
   const rankKey = user?.rank && RANK_BADGE[user.rank] ? user.rank : 'Bronze'
-  const displayName =
-    (typeof route.params?.userName === 'string' && route.params.userName.trim()) ||
-    user?.name ||
-    'Player'
+  const routeUserName =
+    typeof route.params?.userName === 'string' ? route.params.userName.trim() : ''
 
   const profileLinkUserId = user?.id ?? userId
   const profileDeepLink =
@@ -136,9 +134,15 @@ export function PlayerSnapshot() {
             >
               <AppIcon name="arrow-back" size={22} color={BRAND.heroInk} />
             </Pressable>
-            <Text style={styles.heroTitle} numberOfLines={2}>
-              {displayName}
-            </Text>
+            <LoadingName
+              loading={loading}
+              name={routeUserName || user?.name}
+              placeholder="Player"
+              spinnerSize={18}
+              spinnerColor={BRAND.heroInk}
+              style={styles.heroTitle}
+              numberOfLines={2}
+            />
             {profileDeepLink ? (
               <Pressable
                 onPress={() => setQrModalVisible(true)}
@@ -162,6 +166,12 @@ export function PlayerSnapshot() {
 
       <View style={styles.surface}>
         {error ? <Text style={styles.errorText}>{error}</Text> : null}
+
+        {loading ? (
+          <View style={styles.loadingWrap}>
+            <RainSpinner size={24} color={theme.tintColor} />
+          </View>
+        ) : null}
 
         {!loading && user && snapshot ? (
           <>
@@ -321,6 +331,10 @@ const getStyles = (theme: any) =>
       paddingHorizontal: SPACING.containerPadding,
       paddingTop: SPACING.xl,
       paddingBottom: SPACING.xl,
+    },
+    loadingWrap: {
+      alignItems: 'center',
+      paddingVertical: SPACING['2xl'],
     },
     errorText: {
       color: theme.mutedForegroundColor,

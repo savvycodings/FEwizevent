@@ -1,7 +1,6 @@
 import { useCallback, useContext, useState } from 'react'
 import { useFocusEffect } from '@react-navigation/native'
 import {
-  ActivityIndicator,
   Alert,
   Pressable,
   ScrollView,
@@ -10,7 +9,7 @@ import {
   View,
 } from 'react-native'
 import { ThemeContext } from '../context'
-import { AppIcon, SearchField, ThemedButton } from '../components'
+import { AppIcon, RainSpinner, SearchField, ThemedButton } from '../components'
 import { RANK_ENTITLEMENT_REWARD, type EntitlementTier } from '../data/rankCatalog'
 import type { EntitlementStatus, RankEntitlementItem } from '../data/rankEntitlements'
 import { apiRequest } from '../api'
@@ -123,7 +122,9 @@ export function AdminRedeem() {
           containerClassName="mb-3 rounded-lg border border-border bg-card px-3"
         />
 
-        {searchLoading ? <ActivityIndicator color={theme.tintColor} /> : null}
+        {searchLoading ? (
+          <RainSpinner size={22} color={theme.tintColor} style={styles.loader} />
+        ) : null}
 
         {!selected ? (
           <View style={styles.playerList}>
@@ -161,7 +162,7 @@ export function AdminRedeem() {
             </View>
 
             {loadingEntitlements ? (
-              <ActivityIndicator color={theme.tintColor} style={{ marginTop: SPACING.lg }} />
+              <RainSpinner size={24} color={theme.tintColor} style={styles.loader} />
             ) : (
               <>
                 {pending.length === 0 ? (
@@ -227,10 +228,14 @@ function EntitlementRedeemRow({
           label={busy ? '…' : 'Redeem'}
           onPress={onRedeem}
           disabled={busy}
+          size="sm"
+          fullWidth={false}
           style={styles.redeemBtn}
         />
       ) : isRedeemed ? (
-        <AppIcon name="list-checks" size={22} color={theme.mutedForegroundColor} />
+        <View style={styles.redeemIcon}>
+          <AppIcon name="list-checks" size={22} color={theme.mutedForegroundColor} />
+        </View>
       ) : null}
     </View>
   )
@@ -311,12 +316,13 @@ const getStyles = (theme: any) =>
     },
     entitlementRow: {
       flexDirection: 'row',
-      alignItems: 'center',
+      alignItems: 'flex-start',
       gap: SPACING.sm,
       borderWidth: 1.5,
       borderColor: theme.borderColor,
       borderRadius: RADIUS.lg,
-      padding: SPACING.md,
+      paddingVertical: SPACING.sm,
+      paddingHorizontal: SPACING.md,
       marginBottom: SPACING.sm,
       backgroundColor: theme.cardBackground ?? theme.backgroundColor,
     },
@@ -337,11 +343,11 @@ const getStyles = (theme: any) =>
       fontSize: TYPOGRAPHY.caption,
     },
     entitlementCode: {
-      marginTop: SPACING.sm,
+      marginTop: SPACING.xs,
       color: theme.tintColor,
       fontFamily: theme.boldFont,
-      fontSize: TYPOGRAPHY.h3,
-      letterSpacing: 4,
+      fontSize: TYPOGRAPHY.body,
+      letterSpacing: 3,
     },
     codeRedeemed: {
       color: theme.mutedForegroundColor,
@@ -362,5 +368,9 @@ const getStyles = (theme: any) =>
       fontSize: TYPOGRAPHY.caption,
     },
     textMuted: { color: theme.mutedForegroundColor },
-    redeemBtn: { minWidth: 88 },
+    redeemBtn: { marginTop: 2 },
+    redeemIcon: { marginTop: 4 },
+    loader: {
+      paddingVertical: SPACING.lg,
+    },
   })

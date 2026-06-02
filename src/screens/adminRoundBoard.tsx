@@ -1,6 +1,5 @@
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import {
-  ActivityIndicator,
   Alert,
   FlatList,
   Pressable,
@@ -19,7 +18,7 @@ import {
   BottomSheetView,
 } from '@gorhom/bottom-sheet'
 import { ThemeContext } from '../context'
-import { ThemedButton, ThemedCard } from '../components'
+import { RainSpinner, ThemedButton, ThemedCard } from '../components'
 import { RADIUS, SPACING, TYPOGRAPHY } from '../constants/layout'
 import { apiRequest } from '../api'
 import {
@@ -110,7 +109,7 @@ export function AdminRoundBoard() {
     let n = 0
     for (const r of attendedRows) {
       const m = matchForFocalRound(matches, r.userId, activeRound)
-      if (!m) n += 1
+      if (!m || m.outcome === 'pending') n += 1
     }
     return n
   }, [attendedRows, matches, activeRound])
@@ -260,23 +259,33 @@ export function AdminRoundBoard() {
 
   const roundTabs =
     scheduledRounds > 0 ? (
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabScroll}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.tabScroll}
+        contentContainerStyle={styles.tabConnectedRow}
+      >
         {Array.from({ length: scheduledRounds }, (_, i) => i + 1).map((r) => (
           <Pressable
             key={r}
             onPress={() => setActiveRound(r)}
             style={({ pressed }) => [
               styles.tabPill,
-              activeRound === r && styles.tabPillActive,
+              activeRound === r ? styles.tabPillActive : styles.tabPillInactive,
               pressed && styles.tabPillPressed,
             ]}
+            accessibilityRole="button"
+            accessibilityState={{ selected: activeRound === r }}
+            accessibilityLabel={`Open Round ${r}`}
           >
-            <Text
-              style={[styles.tabPillLabel, activeRound === r && styles.tabPillLabelActive]}
-              numberOfLines={1}
-            >
-              Round {r}
-            </Text>
+            <View style={[styles.tabLabelPill, activeRound === r && styles.tabLabelPillActive]}>
+              <Text
+                style={[styles.tabPillText, activeRound === r && styles.tabPillTextActive]}
+                numberOfLines={1}
+              >
+                Round {r}
+              </Text>
+            </View>
           </Pressable>
         ))}
       </ScrollView>
@@ -284,9 +293,31 @@ export function AdminRoundBoard() {
 
   const guardOk = useMatchTracking && scheduledRounds > 0
 
+  const listHeader = (
+    <>
+      <ThemedCard style={styles.eventCard}>
+        <Text style={styles.eventTitle}>{event?.title || 'Event'}</Text>
+        <Text style={styles.eventMeta}>
+          {formatEventDateLabel(event?.eventDate ?? null)}
+          {event?.location?.trim() ? ` · ${event.location.trim()}` : ''}
+        </Text>
+      </ThemedCard>
+
+      <View>{roundTabs}</View>
+
+      {missingResultCount > 0 ? (
+        <View style={styles.banner}>
+          <Text style={styles.bannerText}>
+            {missingResultCount} player{missingResultCount === 1 ? '' : 's'} missing a result this round.
+          </Text>
+        </View>
+      ) : null}
+    </>
+  )
+
   const mainBody = loading ? (
     <View style={styles.centered}>
-      <ActivityIndicator size="large" color={theme.tintColor} />
+      <RainSpinner size={28} color={theme.tintColor} />
     </View>
   ) : !guardOk ? (
     <ThemedCard style={styles.emptyCard}>
@@ -301,37 +332,20 @@ export function AdminRoundBoard() {
       />
     </ThemedCard>
   ) : (
-    <>
-      <ThemedCard style={styles.eventCard}>
-        <Text style={styles.eventTitle}>{event?.title || 'Event'}</Text>
-        <Text style={styles.eventMeta}>
-          {formatEventDateLabel(event?.eventDate ?? null)}
-          {event?.location?.trim() ? ` · ${event.location.trim()}` : ''}
-        </Text>
-      </ThemedCard>
-
-      <View style={styles.tabsWrap}>{roundTabs}</View>
-
-      {missingResultCount > 0 ? (
-        <View style={styles.banner}>
-          <Text style={styles.bannerText}>
-            {missingResultCount} player{missingResultCount === 1 ? '' : 's'} missing a result this round.
-          </Text>
-        </View>
-      ) : null}
-
-      <FlatList
-        ref={listRef}
-        data={attendedRows}
-        keyExtractor={(item) => String(item.userId)}
-        keyboardShouldPersistTaps="handled"
-        onScrollToIndexFailed={(info) => {
-          setTimeout(() => {
-            listRef.current?.scrollToOffset({ offset: info.averageItemLength * info.index, animated: true })
-          }, 50)
-        }}
-        getItemLayout={(_, index) => ({ length: ROW_H, offset: ROW_H * index, index })}
-        renderItem={({ item }) => {
+    <FlatList
+      ref={listRef}
+      style={styles.listFlex}
+      data={attendedRows}
+      keyExtractor={(item) => String(item.userId)}
+      keyboardShouldPersistTaps="handled"
+      ListHeaderComponent={listHeader}
+      onScrollToIndexFailed={(info) => {
+        setTimeout(() => {
+          listRef.current?.scrollToOffset({ offset: info.averageItemLength * info.index, animated: true })
+        }, 50)
+      }}
+      getItemLayout={(_, index) => ({ length: ROW_H, offset: ROW_H * index, index })}
+      renderItem={({ item }) => {
           const focalId = item.userId
           const m = matchForFocalRound(matches, focalId, activeRound)
           const draft = draftOpponent[focalId]
@@ -352,9 +366,6 @@ export function AdminRoundBoard() {
                 <Text style={styles.playerName} numberOfLines={1}>
                   {item.userName}
                 </Text>
-                <Text style={styles.playerEmail} numberOfLines={1}>
-                  {item.userEmail}
-                </Text>
               </View>
               <Pressable
                 onPress={() => openPicker(focalId)}
@@ -370,26 +381,31 @@ export function AdminRoundBoard() {
                 ) : null}
               </Pressable>
               <View style={styles.wldWrap}>
-                {(['win', 'loss', 'draw'] as const).map((res) => (
-                  <Pressable
-                    key={res}
-                    disabled={busy || effectiveOpp == null}
-                    onPress={() => postResult(focalId, effectiveOpp!, res)}
-                    style={({ pressed }) => [
-                      styles.wldMini,
-                      curOutcome === res && styles.wldMiniOn,
-                      pressed && !busy && effectiveOpp != null && styles.wldMiniPressed,
-                      (busy || effectiveOpp == null) && styles.wldMiniDim,
-                    ]}
-                  >
-                    <Text
-                      style={[styles.wldMiniLbl, curOutcome === res && styles.wldMiniLblOn]}
-                      numberOfLines={1}
+                {(['win', 'loss', 'draw'] as const).map((res) => {
+                  const isSelected = curOutcome === res
+                  const disabled = busy || effectiveOpp == null
+                  return (
+                    <Pressable
+                      key={res}
+                      disabled={disabled}
+                      onPress={() => postResult(focalId, effectiveOpp!, res)}
+                      style={({ pressed }) => [
+                        styles.wldMini,
+                        pressed && !disabled && styles.wldMiniPressed,
+                        disabled && !isSelected && styles.wldMiniDim,
+                      ]}
+                      accessibilityState={{ selected: isSelected }}
                     >
-                      {res === 'win' ? 'W' : res === 'loss' ? 'L' : 'D'}
-                    </Text>
-                  </Pressable>
-                ))}
+                      <View
+                        style={[styles.wldLetterRing, isSelected && styles.wldLetterRingSelected]}
+                      >
+                        <Text style={styles.wldMiniLbl} numberOfLines={1}>
+                          {res === 'win' ? 'W' : res === 'loss' ? 'L' : 'D'}
+                        </Text>
+                      </View>
+                    </Pressable>
+                  )
+                })}
               </View>
               <Pressable
                 onPress={() => clearRound(focalId)}
@@ -409,13 +425,13 @@ export function AdminRoundBoard() {
         ItemSeparatorComponent={() => <View style={styles.rowSep} />}
         ListFooterComponent={<View style={{ height: SPACING['3xl'] }} />}
       />
-    </>
   )
 
   return (
     <BottomSheetModalProvider>
       <View style={styles.screen}>
-        {mainBody}
+        <View style={styles.hero} />
+        <View style={styles.surface}>{mainBody}</View>
         <BottomSheetModal
           ref={sheetRef}
           snapPoints={['56%', '88%']}
@@ -484,8 +500,23 @@ export function AdminRoundBoard() {
 const getStyles = (theme: any) =>
   StyleSheet.create({
     screen: { flex: 1, backgroundColor: theme.backgroundColor },
+    hero: {
+      backgroundColor: theme.tintColor,
+      paddingBottom: SPACING['3xl'],
+    },
+    surface: {
+      flex: 1,
+      marginTop: -SPACING.xl,
+      borderTopLeftRadius: RADIUS.xl,
+      borderTopRightRadius: RADIUS.xl,
+      backgroundColor: theme.backgroundColor,
+      paddingHorizontal: SPACING.containerPadding,
+      paddingTop: SPACING.xl,
+      overflow: 'hidden',
+    },
+    listFlex: { flex: 1 },
     centered: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-    eventCard: { marginHorizontal: SPACING.containerPadding, marginTop: SPACING.sm, marginBottom: SPACING.sm },
+    eventCard: { marginBottom: SPACING.sm },
     eventTitle: {
       color: theme.textColor,
       fontFamily: theme.boldFont,
@@ -497,37 +528,67 @@ const getStyles = (theme: any) =>
       fontFamily: theme.regularFont,
       fontSize: TYPOGRAPHY.caption,
     },
-    tabsWrap: {
-      paddingHorizontal: SPACING.containerPadding,
-      marginBottom: SPACING.sm,
-    },
     tabScroll: { flexGrow: 0 },
-    tabPill: {
-      paddingHorizontal: SPACING.lg,
-      paddingVertical: SPACING.md,
-      borderRadius: RADIUS.lg,
-      borderWidth: StyleSheet.hairlineWidth * 2,
+    tabConnectedRow: {
+      flexDirection: 'row',
+      borderWidth: 1.5,
       borderColor: theme.borderColor,
-      marginRight: SPACING.sm,
-      backgroundColor: theme.backgroundColor,
-      minHeight: 44,
+      borderRadius: RADIUS.full,
+      backgroundColor: theme.cardBackground ?? theme.backgroundColor,
+      padding: 2,
+      marginBottom: SPACING.md,
+      minWidth: '100%',
+    },
+    tabPill: {
+      flex: 1,
+      minWidth: 88,
+      paddingHorizontal: SPACING.xs,
+      paddingVertical: SPACING.xs,
+      borderRadius: 0,
+      borderWidth: 0,
+      borderColor: 'transparent',
+      backgroundColor: 'transparent',
+      minHeight: 36,
       justifyContent: 'center',
+      alignItems: 'center',
+      position: 'relative',
+      overflow: 'visible',
+    },
+    tabPillInactive: {
+      borderColor: 'transparent',
+      zIndex: 1,
     },
     tabPillActive: {
-      borderColor: theme.tintColor,
-      backgroundColor: theme.tintColor,
+      borderColor: 'transparent',
+      zIndex: 2,
     },
     tabPillPressed: { opacity: 0.88 },
-    tabPillLabel: {
-      color: theme.textColor,
-      fontFamily: theme.mediumFont,
-      fontSize: TYPOGRAPHY.caption,
+    tabLabelPill: {
+      borderRadius: 999,
+      paddingHorizontal: SPACING.md,
+      paddingVertical: 6,
+      minHeight: 30,
+      backgroundColor: 'transparent',
+      alignItems: 'center',
+      justifyContent: 'center',
+      alignSelf: 'center',
+      overflow: 'hidden',
+      flexGrow: 0,
+      flexShrink: 1,
     },
-    tabPillLabelActive: {
-      color: theme.tintTextColor ?? theme.backgroundColor,
+    tabLabelPillActive: {
+      backgroundColor: theme.tintColor,
+      borderRadius: 999,
+    },
+    tabPillText: {
+      color: theme.textColor,
+      fontFamily: theme.semiBoldFont,
+      fontSize: TYPOGRAPHY.bodySmall,
+    },
+    tabPillTextActive: {
+      color: '#000',
     },
     banner: {
-      marginHorizontal: SPACING.containerPadding,
       marginBottom: SPACING.sm,
       padding: SPACING.sm,
       borderRadius: RADIUS.md,
@@ -543,11 +604,9 @@ const getStyles = (theme: any) =>
     row: {
       flexDirection: 'row',
       alignItems: 'center',
-      paddingHorizontal: SPACING.containerPadding,
       minHeight: ROW_H - 1,
     },
     rowSep: {
-      marginLeft: SPACING.containerPadding,
       height: StyleSheet.hairlineWidth * 2,
       backgroundColor: theme.borderColor,
     },
@@ -561,7 +620,10 @@ const getStyles = (theme: any) =>
     },
     colOpp: {
       flex: 1,
-      paddingHorizontal: SPACING.xs,
+      flexShrink: 1,
+      minWidth: 0,
+      marginRight: SPACING.lg,
+      paddingLeft: SPACING.xs,
       justifyContent: 'center',
     },
     colOppPressed: { opacity: 0.85 },
@@ -572,31 +634,48 @@ const getStyles = (theme: any) =>
       fontFamily: theme.regularFont,
       fontSize: 11,
     },
-    wldWrap: { flexDirection: 'row', gap: 4, marginRight: SPACING.xs },
-    wldMini: {
-      minWidth: 40,
-      paddingVertical: SPACING.sm,
-      paddingHorizontal: SPACING.sm,
-      borderRadius: RADIUS.md,
-      borderWidth: StyleSheet.hairlineWidth * 2,
-      borderColor: theme.borderColor,
+    wldWrap: {
+      flexDirection: 'row',
+      gap: 2,
+      flexShrink: 0,
+      marginLeft: SPACING.sm,
+      marginRight: SPACING.xs,
       alignItems: 'center',
-      backgroundColor: theme.backgroundColor,
     },
-    wldMiniOn: {
-      borderColor: theme.tintColor,
-      backgroundColor: theme.tintColor,
+    wldMini: {
+      paddingVertical: 4,
+      paddingHorizontal: 2,
+      alignItems: 'center',
+      justifyContent: 'center',
     },
-    wldMiniPressed: { opacity: 0.88 },
-    wldMiniDim: { opacity: 0.45 },
-    wldMiniLbl: { fontFamily: theme.boldFont, fontSize: 12, color: theme.textColor },
-    wldMiniLblOn: { color: theme.tintTextColor ?? theme.backgroundColor },
+    wldLetterRing: {
+      width: 26,
+      height: 26,
+      borderRadius: 13,
+      borderWidth: 1.5,
+      borderColor: 'transparent',
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: 'transparent',
+    },
+    wldLetterRingSelected: {
+      borderColor: '#8FD3FF',
+      backgroundColor: 'rgba(143, 211, 255, 0.12)',
+    },
+    wldMiniPressed: { opacity: 0.85 },
+    wldMiniDim: { opacity: 0.35 },
+    wldMiniLbl: {
+      fontFamily: theme.boldFont,
+      fontSize: 12,
+      color: theme.textColor,
+      lineHeight: 14,
+    },
     clearBtn: { paddingVertical: 6, paddingHorizontal: 4, minWidth: 44, alignItems: 'center' },
     clearBtnPressed: { opacity: 0.8 },
     clearBtnOff: { opacity: 0.4 },
     clearLbl: { fontFamily: theme.mediumFont, fontSize: TYPOGRAPHY.caption, color: theme.tintColor },
     clearLblOff: { color: theme.mutedForegroundColor },
-    emptyCard: { margin: SPACING.containerPadding, gap: SPACING.sm },
+    emptyCard: { gap: SPACING.sm },
     emptyTitle: { fontFamily: theme.semiBoldFont, fontSize: TYPOGRAPHY.body, color: theme.textColor },
     emptyHint: { fontFamily: theme.regularFont, fontSize: TYPOGRAPHY.caption, color: theme.mutedForegroundColor },
     emptyBtn: { marginTop: SPACING.sm },

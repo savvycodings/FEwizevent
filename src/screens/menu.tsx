@@ -65,16 +65,14 @@ export function Menu({ navigation }: { navigation: any }) {
       style={styles.screen}
       contentContainerStyle={[styles.content, { paddingBottom: scrollBottom }]}
     >
-      <ScreenHero title="Menu" subtitle="Shortcuts, settings, and account." />
+      <ScreenHero title="Menu" subtitle="Settings and account." />
 
       <ScreenSurface>
         <Surface variant="muted" padding="lg">
           <Text style={styles.accountName}>{currentUser?.name || 'Guest'}</Text>
-          {currentUser?.email ? (
-            <Text style={styles.accountEmail}>{currentUser.email}</Text>
-          ) : (
+          {!currentUser?.id ? (
             <Text style={styles.accountEmail}>Not signed in</Text>
-          )}
+          ) : null}
         </Surface>
 
         <Divider faint spacing="lg" />

@@ -10,9 +10,9 @@ import {
   ScrollView,
   Dimensions,
   Keyboard,
-  ActivityIndicator
 } from 'react-native'
 import { ThemeContext } from '../context'
+import { RainSpinner } from '../components'
 import { DOMAIN } from '../../constants'
 import { useActionSheet } from '@expo/react-native-action-sheet'
 import Ionicons from '@expo/vector-icons/Ionicons'
@@ -429,7 +429,7 @@ export function Assistant() {
         {
           loading && (
             <View style={styles.loadingContainer}>
-              <ActivityIndicator />
+              <RainSpinner size={24} color={theme.tintColor} />
             </View>
           )
         }

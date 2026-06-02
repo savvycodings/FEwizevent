@@ -2,7 +2,7 @@ import { useCallback, useContext, useState } from 'react'
 import { Image, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { useFocusEffect, useRoute } from '@react-navigation/native'
 import { AppContext, ThemeContext } from '../context'
-import { BadgeVectorIcon, ThemedCard } from '../components'
+import { BadgeVectorIcon, LoadingName, RainSpinner, RemoteImage, ThemedCard } from '../components'
 import { RADIUS, SPACING, TYPOGRAPHY } from '../constants/layout'
 import { apiRequest } from '../api'
 
@@ -105,6 +105,7 @@ export function PlayerInfoDetail() {
   const [badges, setBadges] = useState<EarnedBadge[]>([])
   const [stats, setStats] = useState({ eventsAttended: 0, eventRecords: 0 })
   const [error, setError] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
 
   const load = useCallback(async () => {
     if (!playerId) {
@@ -113,6 +114,7 @@ export function PlayerInfoDetail() {
     }
     try {
       setError(null)
+      setLoading(true)
       const res = await apiRequest<PlayerDetailsResponse>(`/admin/users/${playerId}/details`)
       const normalizedUser: Player = {
         ...res.user,
@@ -133,6 +135,8 @@ export function PlayerInfoDetail() {
       setPlayer(null)
       setAttendance([])
       setBadges([])
+    } finally {
+      setLoading(false)
     }
   }, [playerId])
 
@@ -161,11 +165,29 @@ export function PlayerInfoDetail() {
       <View style={styles.surface}>
         {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
-        {player ? (
+        {loading ? (
+          <View style={styles.loadingWrap}>
+            <RainSpinner size={24} color={theme.tintColor} />
+          </View>
+        ) : null}
+
+        {!loading && player ? (
           <ThemedCard style={styles.playerCard}>
             <View style={styles.playerHeaderRow}>
               {player.profileImageUrl ? (
-                <Image source={{ uri: player.profileImageUrl }} style={styles.playerAvatar} />
+                <RemoteImage
+                  uri={player.profileImageUrl}
+                  style={styles.playerAvatar}
+                  spinnerSize={18}
+                  spinnerColor={theme.tintColor}
+                  fallback={
+                    <View style={styles.playerAvatarFallback}>
+                      <Text style={styles.playerAvatarInitial}>
+                        {player.name.charAt(0).toUpperCase()}
+                      </Text>
+                    </View>
+                  }
+                />
               ) : (
                 <View style={styles.playerAvatarFallback}>
                   <Text style={styles.playerAvatarInitial}>{player.name.charAt(0).toUpperCase()}</Text>
@@ -269,6 +291,10 @@ const getStyles = (theme: any) =>
       backgroundColor: theme.backgroundColor,
       paddingHorizontal: SPACING.containerPadding,
       paddingTop: SPACING.xl,
+    },
+    loadingWrap: {
+      alignItems: 'center',
+      paddingVertical: SPACING['2xl'],
     },
     errorText: {
       color: theme.mutedForegroundColor,

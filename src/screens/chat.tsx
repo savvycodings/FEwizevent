@@ -6,13 +6,13 @@ import {
   TouchableHighlight,
   TextInput,
   ScrollView,
-  ActivityIndicator,
   FlatList,
   Keyboard
 } from 'react-native'
 import 'react-native-get-random-values'
 import { useContext, useState, useRef } from 'react'
 import { ThemeContext, AppContext } from '../context'
+import { RainSpinner } from '../components'
 import { getEventSource, getFirstNCharsOrLess, getChatType } from '../utils'
 import { v4 as uuid } from 'uuid'
 import Ionicons from '@expo/vector-icons/Ionicons'
@@ -429,7 +429,7 @@ export function Chat() {
         }
         {
           loading && (
-            <ActivityIndicator style={styles.loadingContainer} />
+            <RainSpinner size={24} color={theme.tintColor} style={styles.loadingContainer} />
           )
         }
       </ScrollView>

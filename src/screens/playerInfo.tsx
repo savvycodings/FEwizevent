@@ -1,7 +1,7 @@
 import { useCallback, useContext, useState } from 'react'
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native'
 import { useFocusEffect } from '@react-navigation/native'
-import { AppIcon } from '../components'
+import { AppIcon, RainSpinner } from '../components'
 import { ThemeContext } from '../context'
 import { ThemedCard, CardCaption } from '../components'
 import { RADIUS, SPACING, TYPOGRAPHY } from '../constants/layout'
@@ -23,15 +23,19 @@ export function PlayerInfo({ navigation }: { navigation: any }) {
   const [players, setPlayers] = useState<Player[]>([])
   const [query, setQuery] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
 
   const loadPlayers = useCallback(async () => {
     try {
       setError(null)
+      setLoading(true)
       const res = await apiRequest<{ users: Player[] }>('/admin/users')
       setPlayers(Array.isArray(res.users) ? res.users : [])
     } catch {
       setError('Could not load player info')
       setPlayers([])
+    } finally {
+      setLoading(false)
     }
   }, [])
 
@@ -62,7 +66,9 @@ export function PlayerInfo({ navigation }: { navigation: any }) {
           />
         </View>
         {error ? <Text style={styles.errorText}>{error}</Text> : null}
-        {filtered.map((player, pi) => (
+        {loading ? <RainSpinner size={22} color={theme.tintColor} style={styles.loader} /> : null}
+        {!loading &&
+          filtered.map((player, pi) => (
           <Pressable
             key={player.id}
             style={styles.playerPressable}
@@ -77,8 +83,8 @@ export function PlayerInfo({ navigation }: { navigation: any }) {
               </CardCaption>
             </ThemedCard>
           </Pressable>
-        ))}
-        {!error && filtered.length === 0 ? (
+          ))}
+        {!loading && !error && filtered.length === 0 ? (
           <ThemedCard style={styles.emptyCard}>
             <Text style={styles.emptyText}>No players found.</Text>
           </ThemedCard>
@@ -135,6 +141,9 @@ const getStyles = (theme: any) =>
       fontFamily: theme.regularFont,
       fontSize: TYPOGRAPHY.caption,
       marginBottom: SPACING.sm,
+    },
+    loader: {
+      paddingVertical: SPACING.lg,
     },
     playerPressable: {
       marginBottom: SPACING.md,

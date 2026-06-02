@@ -1,10 +1,11 @@
 import { useCallback, useContext, useMemo, useState } from 'react'
-import { ActivityIndicator, View } from 'react-native'
+import { View } from 'react-native'
 import { useFocusEffect } from '@react-navigation/native'
 import { DeckPieChart } from '@/components/charts/DeckPieChart'
 import { deckPieColor } from '@/components/charts/deckPieColors'
 import type { DeckRadarStat } from '@/components/charts/deckRadarAxes'
 import { DeckPicker } from '@/components/content/DeckPicker'
+import { RainSpinner } from '@/components/ui/rain-spinner'
 import { Text } from '@/components/ui/text'
 import { ThemeContext } from '../../context'
 import { apiRequest } from '@/api'
@@ -76,7 +77,7 @@ export function DeckProfileSection({ userId }: DeckProfileSectionProps) {
   )
 
   if (loading) {
-    return <ActivityIndicator color={theme.tintColor} style={{ paddingVertical: SPACING.xl }} />
+    return <RainSpinner size={24} color={theme.tintColor} style={{ paddingVertical: SPACING.xl }} />
   }
 
   if (error && !profile) {
@@ -99,7 +100,7 @@ export function DeckProfileSection({ userId }: DeckProfileSectionProps) {
         disabled={saving}
       />
       {saving ? (
-        <ActivityIndicator color={theme.tintColor} style={{ marginTop: SPACING.md }} />
+        <RainSpinner size={22} color={theme.tintColor} style={{ marginTop: SPACING.md }} />
       ) : null}
       <DeckPieChart
         data={pieSlices}

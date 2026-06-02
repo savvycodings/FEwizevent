@@ -35,9 +35,22 @@ function resolveVector(
   return null
 }
 
+function parseViewBox(viewBox: string) {
+  const [x, y, w, h] = viewBox.split(/\s+/).map(Number)
+  return { x, y, w, h }
+}
+
+/** Extra viewBox margin so edge paths are not clipped. */
+const VIEWBOX_PAD = 3
+
+function expandViewBox(viewBox: string, pad = VIEWBOX_PAD): string {
+  const { x, y, w, h } = parseViewBox(viewBox)
+  return `${x - pad} ${y - pad} ${w + pad * 2} ${h + pad * 2}`
+}
+
 /**
  * Renders an @aliimam/vectors Shapes glyph via react-native-svg.
- * Square container + preserveAspectRatio keeps icons visually balanced in tiles.
+ * Padded viewBox + meet scaling keeps the full path visible in square tiles.
  */
 export function BadgeVectorIcon({
   badgeId,
@@ -57,19 +70,20 @@ export function BadgeVectorIcon({
     'Badge'
 
   const containerStyle = useMemo(
-    () => [styles.box, { minWidth: size, minHeight: size }, style],
+    () => [styles.box, { width: size, height: size }, style],
     [size, style]
   )
 
   if (!name) return null
 
   const { viewBox, d } = BADGE_VECTOR_PATHS[name]
+  const paddedViewBox = expandViewBox(viewBox)
 
   const svg = (
     <Svg
       width={size}
       height={size}
-      viewBox={viewBox}
+      viewBox={paddedViewBox}
       preserveAspectRatio="xMidYMid meet"
       accessibilityLabel={label}
     >
@@ -100,5 +114,6 @@ const styles = StyleSheet.create({
   box: {
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'visible',
   },
 })

@@ -1,6 +1,5 @@
 import { useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import {
-  ActivityIndicator,
   Alert,
   Image,
   Modal,
@@ -32,6 +31,7 @@ import {
 } from '../../data/rankCatalog'
 import { RADIUS, SPACING, TYPOGRAPHY } from '../../constants/layout'
 import { AppIcon, SELECTION_ICON_NAME } from '../ui/app-icon'
+import { RainSpinner } from '../ui/rain-spinner'
 import { ToolbarRow } from '../layout/ToolbarRow'
 import { rowGrow } from '../layout/PressableRow'
 type RanksBadgesModalProps = {
@@ -164,7 +164,7 @@ export function RanksBadgesModal({
             showsVerticalScrollIndicator={false}
           >
             {loadingEntitlements ? (
-              <ActivityIndicator color={theme.tintColor} style={{ marginBottom: SPACING.md }} />
+              <RainSpinner size={24} color={theme.tintColor} style={{ marginBottom: SPACING.md }} />
             ) : null}
             {rankRows.map((row) => (
               <RankEntitlementRow

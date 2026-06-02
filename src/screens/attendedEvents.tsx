@@ -1,7 +1,7 @@
 import { useCallback, useContext, useState } from 'react'
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { useFocusEffect } from '@react-navigation/native'
-import { AppIcon, DeckIcon, ScreenHero, ScreenSurface, Surface, ToolbarRow } from '../components'
+import { AppIcon, DeckIcon, RainSpinner, ScreenHero, ScreenSurface, Surface, ToolbarRow } from '../components'
 import { deckShortLabelForId } from '../constants/deckCatalog'
 import { rowGrow } from '../components/layout/PressableRow'
 import { AppContext, ThemeContext } from '../context'
@@ -110,7 +110,7 @@ export function AttendedEvents({ navigation }: { navigation: any }) {
             <Text style={styles.emptyText}>Sign in to see your attended events.</Text>
           </View>
         ) : loading ? (
-          <ActivityIndicator color={theme.tintColor} style={styles.loader} />
+          <RainSpinner size={24} color={theme.tintColor} style={styles.loader} />
         ) : events.length === 0 ? (
           <View style={styles.emptyWrap}>
             <AppIcon name="calendar" size={28} color={theme.mutedForegroundColor} />

@@ -1,6 +1,6 @@
 import { useCallback, useContext, useState } from 'react'
 import { ScrollView, StyleSheet, Text, View } from 'react-native'
-import { useFocusEffect } from '@react-navigation/native'
+import { useFocusEffect, useNavigation } from '@react-navigation/native'
 import { AppContext, ThemeContext } from '../context'
 import {
   DeckLabel,
@@ -52,9 +52,12 @@ function storeLabel(store: string | null | undefined): string | null {
   return null
 }
 
+const SEASON_LADDER_PREVIEW = 10
+
 export function Play() {
   const { theme } = useContext(ThemeContext)
   const { currentUser } = useContext(AppContext)
+  const navigation = useNavigation<any>()
   const styles = getStyles(theme)
   const [recentEvents, setRecentEvents] = useState<PlayRecentEvent[]>([])
   const [activeDeckId, setActiveDeckId] = useState<string | null>(null)
@@ -101,11 +104,9 @@ export function Play() {
           <Text style={styles.profileName}>{currentUser?.name || 'Trainer'}</Text>
           {homeStoreName ? (
             <Text style={styles.profileMeta}>Home store · {homeStoreName}</Text>
-          ) : currentUser?.email ? (
-            <Text style={styles.profileMeta}>{currentUser.email}</Text>
-          ) : (
+          ) : !currentUser?.id ? (
             <Text style={styles.profileMeta}>Sign in to sync attendance and season XP.</Text>
-          )}
+          ) : null}
           {currentUser?.id ? (
             activeDeckId || activeDeckLabel ? (
               <DeckLabel
@@ -124,8 +125,12 @@ export function Play() {
         </View>
         <Divider faint spacing="md" />
 
-        <Section title="Season ladder" compactTopSpacing>
-          <SeasonLeaderboard mode="combined" />
+        <Section
+          title="Season ladder"
+          compactTopSpacing
+          onPressSeeAll={() => navigation.navigate('SeasonLeaderboard')}
+        >
+          <SeasonLeaderboard mode="combined" limit={SEASON_LADDER_PREVIEW} />
         </Section>
 
         <Section title="Store teams" compactTopSpacing>

@@ -1,8 +1,6 @@
 import { useContext, useEffect, useState } from 'react'
 import {
-  ActivityIndicator,
   Alert,
-  Image,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -13,14 +11,9 @@ import {
 import { pickImageWithSource } from '../utils/pickImageWithSource'
 import { AppContext, ThemeContext } from '../context'
 import { RADIUS, SPACING, TYPOGRAPHY } from '../constants/layout'
-import { SegmentedTabs, ThemedButton, ThemedCard } from '../components'
-import { DOMAIN } from '../../constants'
-import { apiRequest } from '../api'
-import {
-  HOME_STORE_LABEL,
-  HOME_STORE_SEGMENT_OPTIONS,
-  type HomeStore,
-} from '../constants/stores'
+import { RainSpinner, RemoteImage, HomeStoreTabs, ThemedButton, ThemedCard } from '../components'
+import { apiRequest, apiUrl, readJsonResponse } from '../api'
+import { type HomeStore } from '../constants/stores'
 import type { User } from '../../types'
 
 function resolvedHomeStore(user: User | null): HomeStore {
@@ -71,24 +64,22 @@ export function AccountManagement() {
         name: file.fileName || `profile-${Date.now()}.jpg`,
         type: file.mimeType || 'image/jpeg',
       } as any)
+      formData.append('userId', String(currentUser.id))
 
-      const uploadResponse = await fetch(`${DOMAIN}/auth/upload-profile`, {
+      const uploadUrl = apiUrl('/auth/profile-image')
+      const uploadResponse = await fetch(uploadUrl, {
         method: 'POST',
         body: formData,
       })
-      const uploadData = await uploadResponse.json()
+      const uploadData = await readJsonResponse<{ user: User; error?: string }>(
+        uploadResponse,
+        uploadUrl
+      )
       if (!uploadResponse.ok) {
         throw new Error(uploadData?.error || 'Profile image upload failed')
       }
 
-      const updateResult = await apiRequest<{ user: any }>('/auth/profile-image', {
-        method: 'POST',
-        body: JSON.stringify({
-          userId: currentUser.id,
-          imageUrl: uploadData.imageUrl,
-        }),
-      })
-      applyUserUpdate(updateResult.user)
+      applyUserUpdate(uploadData.user)
       Alert.alert('Success', 'Profile picture updated')
     } catch (err: any) {
       Alert.alert('Update failed', err?.message || 'Please try again')
@@ -183,10 +174,22 @@ export function AccountManagement() {
           >
             {photoLoading ? (
               <View style={[styles.avatarFallback, styles.avatarLoadingWrap]}>
-                <ActivityIndicator color={theme.textColor} />
+                <RainSpinner size={22} color={theme.textColor} />
               </View>
             ) : currentUser?.profileImageUrl ? (
-              <Image source={{ uri: currentUser.profileImageUrl }} style={styles.avatar} />
+              <RemoteImage
+                uri={currentUser.profileImageUrl}
+                style={styles.avatar}
+                spinnerSize={20}
+                spinnerColor={theme.textColor}
+                fallback={
+                  <View style={styles.avatarFallback}>
+                    <Text style={styles.avatarInitial}>
+                      {(currentUser?.name || '?').charAt(0).toUpperCase()}
+                    </Text>
+                  </View>
+                }
+              />
             ) : (
               <View style={styles.avatarFallback}>
                 <Text style={styles.avatarInitial}>
@@ -218,18 +221,12 @@ export function AccountManagement() {
           />
 
           <Text style={styles.label}>Home store</Text>
-          <Text style={styles.fieldHint}>
-            Used for {HOME_STORE_LABEL.glendower} and {HOME_STORE_LABEL.rosebank} store team standings.
-          </Text>
-          <SegmentedTabs<HomeStore>
+          <HomeStoreTabs
             style={styles.storeTabs}
             value={homeStore}
             onChange={persistHomeStore}
-            options={HOME_STORE_SEGMENT_OPTIONS}
+            disabled={storeSaving}
           />
-          {storeSaving ? (
-            <Text style={styles.storeSavingHint}>Updating home store…</Text>
-          ) : null}
 
           <ThemedButton
             label={profileSaving ? 'Saving...' : 'Save profile'}
@@ -308,10 +305,10 @@ const getStyles = (theme: any) =>
       fontSize: TYPOGRAPHY.h3,
     },
     label: {
-      color: theme.mutedForegroundColor,
-      fontFamily: theme.mediumFont,
-      fontSize: TYPOGRAPHY.caption,
-      marginBottom: SPACING.xs,
+      color: '#fff',
+      fontFamily: theme.boldFont,
+      fontSize: TYPOGRAPHY.body,
+      marginBottom: SPACING.sm,
     },
     input: {
       borderColor: theme.borderColor,
@@ -324,20 +321,7 @@ const getStyles = (theme: any) =>
       fontFamily: theme.regularFont,
       marginBottom: SPACING.md,
     },
-    fieldHint: {
-      color: theme.mutedForegroundColor,
-      fontFamily: theme.regularFont,
-      fontSize: TYPOGRAPHY.caption,
-      lineHeight: TYPOGRAPHY.caption * 1.4,
-      marginBottom: SPACING.sm,
-    },
     storeTabs: {
-      marginBottom: SPACING.sm,
-    },
-    storeSavingHint: {
-      color: theme.mutedForegroundColor,
-      fontFamily: theme.regularFont,
-      fontSize: TYPOGRAPHY.caption,
       marginBottom: SPACING.lg,
     },
   })
