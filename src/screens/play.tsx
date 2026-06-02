@@ -2,15 +2,25 @@ import { useCallback, useContext, useState } from 'react'
 import { ScrollView, StyleSheet, Text, View } from 'react-native'
 import { useFocusEffect } from '@react-navigation/native'
 import { AppContext, ThemeContext } from '../context'
-import { Divider, EmptyState, Section, ThemedCard, CardCaption } from '../components'
-import { RADIUS, SPACING, TYPOGRAPHY } from '../constants/layout'
-import { championshipPoints, eventBuckets } from '../data/mockData'
+import {
+  DeckLabel,
+  Divider,
+  EmptyState,
+  FeedEventCard,
+  ScreenHero,
+  ScreenSurface,
+  Section,
+} from '../components'
+import { SeasonLeaderboard } from '../components/content/SeasonLeaderboard'
+import { HOME_STORE_LABEL, type HomeStore } from '../constants/stores'
+import { SPACING, TYPOGRAPHY } from '../constants/layout'
 import { apiRequest } from '../api'
 
 type PlayRecentEvent = {
   id: number
   eventTitle: string
   markedAt: string
+  deckId?: string | null
 }
 
 function formatEventDateLabel(iso: string): string {
@@ -19,102 +29,136 @@ function formatEventDateLabel(iso: string): string {
   return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
+function formatRelativeTime(iso: string): string {
+  const d = new Date(iso)
+  const t = d.getTime()
+  if (Number.isNaN(t)) return ''
+  const diffMs = Date.now() - t
+  if (diffMs < 0) return 'Just now'
+  const mins = Math.floor(diffMs / 60000)
+  if (mins < 1) return 'Just now'
+  if (mins < 60) return `${mins}m ago`
+  const hrs = Math.floor(mins / 60)
+  if (hrs < 24) return `${hrs}h ago`
+  const days = Math.floor(hrs / 24)
+  if (days < 7) return `${days}d ago`
+  return formatEventDateLabel(iso)
+}
+
+function storeLabel(store: string | null | undefined): string | null {
+  if (store === 'glendower' || store === 'rosebank') {
+    return HOME_STORE_LABEL[store as HomeStore]
+  }
+  return null
+}
+
 export function Play() {
   const { theme } = useContext(ThemeContext)
   const { currentUser } = useContext(AppContext)
   const styles = getStyles(theme)
   const [recentEvents, setRecentEvents] = useState<PlayRecentEvent[]>([])
+  const [activeDeckId, setActiveDeckId] = useState<string | null>(null)
+  const [activeDeckLabel, setActiveDeckLabel] = useState<string | null>(null)
 
-  const loadPlayEvents = useCallback(async () => {
+  const loadPlay = useCallback(async () => {
     if (!currentUser?.id) {
       setRecentEvents([])
+      setActiveDeckId(null)
+      setActiveDeckLabel(null)
       return
     }
     try {
-      const res = await apiRequest<{ feed: PlayRecentEvent[] }>(`/auth/home-summary?userId=${currentUser.id}`)
-      setRecentEvents(Array.isArray(res.feed) ? res.feed : [])
+      const [summaryRes, deckRes] = await Promise.all([
+        apiRequest<{ feed: PlayRecentEvent[] }>(`/auth/home-summary?userId=${currentUser.id}`),
+        apiRequest<{ activeDeckId: string | null; activeDeckLabel: string | null }>(
+          `/auth/deck-profile?userId=${currentUser.id}`
+        ).catch(() => ({ activeDeckId: null, activeDeckLabel: null })),
+      ])
+      setRecentEvents(Array.isArray(summaryRes.feed) ? summaryRes.feed : [])
+      setActiveDeckId(deckRes.activeDeckId ?? null)
+      setActiveDeckLabel(deckRes.activeDeckLabel ?? null)
     } catch {
       setRecentEvents([])
+      setActiveDeckId(null)
+      setActiveDeckLabel(null)
     }
   }, [currentUser?.id])
 
   useFocusEffect(
     useCallback(() => {
-      loadPlayEvents()
-    }, [loadPlayEvents])
+      loadPlay()
+    }, [loadPlay])
   )
+
+  const homeStoreName = storeLabel(currentUser?.homeStore)
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
-      <View style={styles.hero}>
-        <Text style={styles.heroTitle}>Play!</Text>
-      </View>
+      <ScreenHero title="Play!" />
 
-      <View style={styles.surface}>
+      <ScreenSurface>
         <View style={styles.profileBlock}>
           <Text style={styles.profileName}>{currentUser?.name || 'Trainer'}</Text>
-          {currentUser?.email ? (
+          {homeStoreName ? (
+            <Text style={styles.profileMeta}>Home store · {homeStoreName}</Text>
+          ) : currentUser?.email ? (
             <Text style={styles.profileMeta}>{currentUser.email}</Text>
           ) : (
-            <Text style={styles.profileMeta}>Sign in to sync attendance and points.</Text>
+            <Text style={styles.profileMeta}>Sign in to sync attendance and season XP.</Text>
           )}
+          {currentUser?.id ? (
+            activeDeckId || activeDeckLabel ? (
+              <DeckLabel
+                deckId={activeDeckId}
+                label={activeDeckLabel}
+                prefix="Profile deck"
+                iconSize={22}
+                textStyle={styles.deckMeta}
+              />
+            ) : (
+              <Text style={styles.deckMeta}>
+                Profile deck · Not selected — set on Profile
+              </Text>
+            )
+          ) : null}
         </View>
         <Divider faint spacing="md" />
 
-        <Section title="Championship points" compactTopSpacing>
-          <ThemedCard premiumRim>
-            <View style={styles.threeColRow}>
-              {championshipPoints.map((item, index) => (
-                <View
-                  key={item.id}
-                  style={[styles.threeColCell, index > 0 ? styles.threeColCellWithRule : null]}
-                >
-                  <Text style={styles.colLabel} numberOfLines={2}>
-                    {item.label}
-                  </Text>
-                  <Text style={styles.colValue}>{item.points}</Text>
-                </View>
-              ))}
-            </View>
-          </ThemedCard>
+        <Section title="Season ladder" compactTopSpacing>
+          <SeasonLeaderboard mode="combined" />
         </Section>
 
-        <Section title="Championship tiers" compactTopSpacing>
-          <ThemedCard premiumRim>
-            <View style={styles.threeColRow}>
-              {eventBuckets.map((item, index) => (
-                <View
-                  key={item.id}
-                  style={[styles.threeColCell, index > 0 ? styles.threeColCellWithRule : null]}
-                >
-                  <Text style={styles.colLabel} numberOfLines={2}>
-                    {item.label}
-                  </Text>
-                  <Text style={styles.colValue}>{item.count}</Text>
-                </View>
-              ))}
-            </View>
-          </ThemedCard>
+        <Section title="Store teams" compactTopSpacing>
+          <SeasonLeaderboard
+            key={`store-${currentUser?.id ?? 0}-${currentUser?.homeStore ?? 'none'}`}
+            mode="store-teams"
+            initialStore={
+              currentUser?.homeStore === 'glendower' || currentUser?.homeStore === 'rosebank'
+                ? currentUser.homeStore
+                : 'glendower'
+            }
+          />
         </Section>
 
         <Section title="Recent events" compactTopSpacing>
           {recentEvents.length > 0 ? (
-            recentEvents.map((item, ri) => (
-              <ThemedCard
-                key={item.id}
-                premiumRim={ri === 0}
-                style={ri === recentEvents.length - 1 ? styles.playEventCardLast : styles.playEventCard}
-              >
-                <CardCaption caption={formatEventDateLabel(item.markedAt)}>
-                  <Text style={styles.playEventTitle}>{item.eventTitle}</Text>
-                </CardCaption>
-              </ThemedCard>
-            ))
+            <View style={styles.eventList}>
+              {recentEvents.map((item, ri) => (
+                <FeedEventCard
+                  key={item.id}
+                  title={item.eventTitle}
+                  subtitle={formatEventDateLabel(item.markedAt)}
+                  timeLabel={formatRelativeTime(item.markedAt)}
+                  deckId={item.deckId}
+                  premiumRim={ri === 0}
+                />
+              ))}
+            </View>
           ) : (
             <EmptyState variant="mutedBand" title="No history yet" message="No attended events yet." />
           )}
         </Section>
-      </View>
+      </ScreenSurface>
     </ScrollView>
   )
 }
@@ -127,25 +171,6 @@ const getStyles = (theme: any) =>
     },
     content: {
       paddingBottom: SPACING['3xl'],
-    },
-    hero: {
-      backgroundColor: theme.tintColor,
-      paddingHorizontal: SPACING.containerPadding,
-      paddingTop: SPACING['2xl'],
-      paddingBottom: SPACING['3xl'],
-    },
-    heroTitle: {
-      color: theme.backgroundColor,
-      fontFamily: theme.boldFont,
-      fontSize: TYPOGRAPHY.h2,
-    },
-    surface: {
-      marginTop: -SPACING['2xl'],
-      borderTopLeftRadius: RADIUS.xl,
-      borderTopRightRadius: RADIUS.xl,
-      backgroundColor: theme.backgroundColor,
-      paddingHorizontal: SPACING.containerPadding,
-      paddingTop: SPACING.xl,
     },
     profileBlock: {
       marginBottom: SPACING.xs,
@@ -163,49 +188,14 @@ const getStyles = (theme: any) =>
       fontSize: TYPOGRAPHY.bodySmall,
       lineHeight: TYPOGRAPHY.bodySmall * 1.4,
     },
-    threeColRow: {
-      flexDirection: 'row',
-      alignItems: 'stretch',
-      width: '100%',
-    },
-    threeColCell: {
-      flex: 1,
-      flexBasis: 0,
-      minWidth: 0,
-      alignItems: 'flex-start',
-      justifyContent: 'flex-start',
-      gap: SPACING.sm,
-      paddingRight: SPACING.sm,
-    },
-    threeColCellWithRule: {
-      borderLeftWidth: StyleSheet.hairlineWidth * 2,
-      borderLeftColor: theme.dividerColor ?? theme.borderColor,
-      paddingLeft: SPACING.sm,
-    },
-    colLabel: {
-      color: theme.mutedForegroundColor,
+    deckMeta: {
+      marginTop: SPACING.xs,
+      color: theme.textColor,
       fontFamily: theme.mediumFont,
-      fontSize: TYPOGRAPHY.caption,
-      lineHeight: Math.round(TYPOGRAPHY.caption * 1.35),
-      textAlign: 'left',
-      width: '100%',
+      fontSize: TYPOGRAPHY.bodySmall,
+      lineHeight: TYPOGRAPHY.bodySmall * 1.4,
     },
-    colValue: {
-      color: theme.textColor,
-      fontFamily: theme.boldFont,
-      fontSize: TYPOGRAPHY.h4,
-      textAlign: 'left',
-    },
-    playEventCard: {
-      marginBottom: SPACING.md,
-    },
-    playEventCardLast: {
-      marginBottom: 0,
-    },
-    playEventTitle: {
-      color: theme.textColor,
-      fontFamily: theme.boldFont,
-      fontSize: TYPOGRAPHY.h4,
-      textAlign: 'left',
+    eventList: {
+      gap: SPACING.md,
     },
   })

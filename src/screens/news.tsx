@@ -1,8 +1,8 @@
 import { useContext } from 'react'
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
-import Ionicons from '@expo/vector-icons/Ionicons'
 import { ThemeContext } from '../context'
-import { Surface } from '../components'
+import { AppIcon, ScreenHero, ScreenSurface, Surface, ToolbarRow } from '../components'
+import { rowGrow } from '../components/layout/PressableRow'
 import { RADIUS, SPACING, TYPOGRAPHY } from '../constants/layout'
 import { newsPosts, type NewsPost } from '../data/newsPosts'
 
@@ -16,12 +16,12 @@ export function News({ navigation }: { navigation: any }) {
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
-      <View style={styles.hero}>
-        <Text style={styles.heroTitle}>News</Text>
-        <Text style={styles.heroSubtitle}>Launches, restocks, and tournaments at the shop.</Text>
-      </View>
+      <ScreenHero
+        title="News"
+        subtitle="Launches, restocks, and tournaments at the shop."
+      />
 
-      <View style={styles.surface}>
+      <ScreenSurface>
         {newsPosts.map((item, index) => (
           <Pressable
             key={item.id}
@@ -44,14 +44,18 @@ export function News({ navigation }: { navigation: any }) {
               <Text style={styles.excerpt} numberOfLines={2}>
                 {item.excerpt}
               </Text>
-              <View style={styles.readRow}>
-                <Text style={styles.readMore}>Read article</Text>
-                <Ionicons name="chevron-forward" size={18} color={theme.tintColor} />
-              </View>
+              <ToolbarRow style={styles.readRow}>
+                <Text style={[rowGrow.text, styles.readMore]} numberOfLines={1}>
+                  Read article
+                </Text>
+                <View style={rowGrow.end}>
+                  <AppIcon name="chevron-right" size={18} color={theme.tintColor} />
+                </View>
+              </ToolbarRow>
             </Surface>
           </Pressable>
         ))}
-      </View>
+      </ScreenSurface>
     </ScrollView>
   )
 }
@@ -64,34 +68,6 @@ const getStyles = (theme: any) =>
     },
     content: {
       paddingBottom: SPACING['4xl'],
-    },
-    hero: {
-      backgroundColor: theme.tintColor,
-      paddingHorizontal: SPACING.containerPadding,
-      paddingTop: SPACING['2xl'],
-      paddingBottom: SPACING['3xl'],
-    },
-    heroTitle: {
-      color: theme.backgroundColor,
-      fontFamily: theme.boldFont,
-      fontSize: TYPOGRAPHY.h2,
-    },
-    heroSubtitle: {
-      marginTop: SPACING.sm,
-      color: theme.backgroundColor,
-      fontFamily: theme.regularFont,
-      fontSize: TYPOGRAPHY.bodySmall,
-      opacity: 0.92,
-      lineHeight: TYPOGRAPHY.bodySmall * 1.4,
-    },
-    surface: {
-      marginTop: -SPACING['2xl'],
-      borderTopLeftRadius: RADIUS.xl,
-      borderTopRightRadius: RADIUS.xl,
-      backgroundColor: theme.backgroundColor,
-      paddingHorizontal: SPACING.containerPadding,
-      paddingTop: SPACING.xl,
-      gap: SPACING.md,
     },
     cardPressable: {
       marginBottom: SPACING.sm,
@@ -148,11 +124,7 @@ const getStyles = (theme: any) =>
       lineHeight: TYPOGRAPHY.bodySmall * 1.45,
       marginBottom: SPACING.md,
     },
-    readRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-    },
+    readRow: {},
     readMore: {
       color: theme.tintColor,
       fontFamily: theme.semiBoldFont,

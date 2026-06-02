@@ -20,13 +20,35 @@ const normalizeDomain = (value?: string) => {
   return `${scheme}://${host}`
 }
 
+/** Android emulator cannot reach host machine via localhost — use 10.0.2.2 */
+function resolveDevApiForPlatform(url: string): string {
+  if (Platform.OS !== 'android') return url
+  try {
+    const withScheme = url.startsWith('http') ? url : `http://${url}`
+    const parsed = new URL(withScheme)
+    if (parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1') {
+      parsed.hostname = '10.0.2.2'
+      return parsed.toString().replace(/\/+$/, '')
+    }
+  } catch {
+    /* keep original */
+  }
+  return url
+}
+
 const env = (process.env.EXPO_PUBLIC_ENV || 'DEVELOPMENT').toUpperCase()
 const devUrl = process.env.EXPO_PUBLIC_DEV_API_URL
 const prodUrl = process.env.EXPO_PUBLIC_PROD_API_URL
 const rawDomain = env === 'DEVELOPMENT' ? devUrl : prodUrl
-const fallbackDevDomain = Platform.OS === 'android' ? 'http://10.0.2.2:3050' : 'http://localhost:3050'
+const fallbackDevDomain = Platform.OS === 'android' ? 'http://10.0.2.2:3060' : 'http://localhost:3060'
 
-export const DOMAIN = normalizeDomain(rawDomain || devUrl || prodUrl || fallbackDevDomain)
+const normalized = normalizeDomain(rawDomain || devUrl || prodUrl || fallbackDevDomain)
+export const DOMAIN =
+  env === 'DEVELOPMENT' ? resolveDevApiForPlatform(normalized) : normalized
+
+if (__DEV__) {
+  console.log('[api] EXPO_PUBLIC_ENV=', env, 'DOMAIN=', DOMAIN)
+}
 
 export const MODELS = {
   claudeOpus47: {

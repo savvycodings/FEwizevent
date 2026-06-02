@@ -37,17 +37,18 @@ export const BADGE_DISPLAY_TITLE: Record<BadgeId, string> = {
   sweat: 'Sweat',
 }
 
+/** One line — how to earn the badge (shown under the name). */
 export const BADGE_AWARD_TEXT: Record<BadgeId, string> = {
-  placed1st: 'Finish 1st in a tournament.',
-  placed2nd: 'Finish 2nd in a tournament.',
-  placed3rd: 'Finish 3rd in a tournament.',
-  champion: 'Win an event.',
-  flawless: 'Win without a single loss.',
-  magician: 'Win a round in an unexpected way.',
-  quick: 'Finish a round exceptionally fast.',
-  scholar: 'Learn from previous mistakes.',
-  scientist: 'Play with smart strategy.',
-  sweat: 'Give maximum effort in a match.',
+  placed1st: 'Finish 1st at an event.',
+  placed2nd: 'Finish 2nd at an event.',
+  placed3rd: 'Finish 3rd at an event.',
+  champion: 'Win the event.',
+  flawless: 'Win the event without a loss.',
+  magician: 'Win a round in a surprising way.',
+  quick: 'Win a round very quickly.',
+  scholar: 'Show clear improvement from past events.',
+  scientist: 'Win with strong strategy.',
+  sweat: 'Give full effort in a match.',
 }
 
 /** Minimal footer line under the rule (rank XP flavor — illustrative). */
@@ -62,17 +63,4 @@ export const BADGE_RANK_XP_NOTE: Record<BadgeId, string> = {
   scholar: '+25 XP · performance',
   scientist: '+25 XP · performance',
   sweat: '+25 XP · performance',
-}
-
-export const BADGE_ASSET: Record<BadgeId, number> = {
-  placed1st: require('../../assets/badges/placed1st.png'),
-  placed2nd: require('../../assets/badges/placed2nd.png'),
-  placed3rd: require('../../assets/badges/placed3rd.png'),
-  champion: require('../../assets/badges/champion.png'),
-  magician: require('../../assets/badges/magician.png'),
-  sweat: require('../../assets/badges/sweat.png'),
-  scholar: require('../../assets/badges/scholar.png'),
-  quick: require('../../assets/badges/quick.png'),
-  scientist: require('../../assets/badges/scientist.png'),
-  flawless: require('../../assets/badges/flawless.png'),
 }

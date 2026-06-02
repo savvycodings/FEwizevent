@@ -1,0 +1,6 @@
+export { BadgeVectorIcon, DEFAULT_BADGE_ICON_COLOR } from './BadgeVectorIcon'
+export type { BadgeVectorIconProps } from './BadgeVectorIcon'
+export { MotionBadgeIcon } from './MotionBadgeIcon'
+export type { MotionBadgeIconProps } from './MotionBadgeIcon'
+export { BADGE_VECTOR_BY_ID, BADGE_VECTOR_PATHS } from './badgeVectorPaths'
+export type { BadgeVectorName } from './badgeVectorPaths'

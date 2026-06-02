@@ -1,7 +1,7 @@
 import { useCallback, useContext, useState } from 'react'
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native'
 import { useFocusEffect } from '@react-navigation/native'
-import Ionicons from '@expo/vector-icons/Ionicons'
+import { AppIcon } from '../components'
 import { ThemeContext } from '../context'
 import { ThemedCard, CardCaption } from '../components'
 import { RADIUS, SPACING, TYPOGRAPHY } from '../constants/layout'
@@ -52,7 +52,7 @@ export function PlayerInfo({ navigation }: { navigation: any }) {
       <View style={styles.hero} />
       <View style={styles.surface}>
         <View style={styles.searchWrap}>
-          <Ionicons name="search-outline" size={18} color={theme.mutedForegroundColor} />
+          <AppIcon name="search" size={18} color={theme.mutedForegroundColor} />
           <TextInput
             value={query}
             onChangeText={setQuery}
@@ -72,7 +72,7 @@ export function PlayerInfo({ navigation }: { navigation: any }) {
               <CardCaption caption={player.email}>
                 <View style={styles.playerRow}>
                   <Text style={styles.playerName}>{player.name}</Text>
-                  <Ionicons name="chevron-forward-outline" size={18} color={theme.mutedForegroundColor} />
+                  <AppIcon name="chevron-right" size={18} color={theme.mutedForegroundColor} />
                 </View>
               </CardCaption>
             </ThemedCard>

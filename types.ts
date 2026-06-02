@@ -17,12 +17,15 @@ export interface Model {
   icon: any
 }
 
+export type HomeStore = 'glendower' | 'rosebank'
+
 export interface User {
   id: number
   name: string
   email: string
   profileImageUrl?: string | null
   isAdmin: boolean
+  homeStore?: HomeStore | null
 }
 
 export interface IAppContext {

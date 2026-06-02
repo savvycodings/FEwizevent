@@ -22,8 +22,8 @@ const colors = {
   wizardsMutedText: '#6C7280',
   wizardsGreen: '#8FD3FF',
   wizardsDarkBg: '#000000',
-  wizardsCardDark: '#0F0F10',
-  wizardsBorderDark: '#222327',
+  wizardsCardDark: '#141418',
+  wizardsBorderDark: '#3f3f46',
   wizardsMutedDark: '#A1A1AA'
 }
 
@@ -181,7 +181,7 @@ const wizards = {
   successTextColor: colors.white,
   infoBackground: 'rgba(143, 211, 255, .22)',
   infoTextColor: colors.white,
-  surfaceMuted: '#161618',
+  surfaceMuted: colors.wizardsCardDark,
   dividerColor: 'rgba(255, 255, 255, 0.1)',
   footerCaptionColor: 'rgba(255, 255, 255, 0.82)',
 }

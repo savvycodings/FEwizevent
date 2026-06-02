@@ -2,7 +2,7 @@ import { useCallback, useContext, useState } from 'react'
 import { Image, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { useFocusEffect, useRoute } from '@react-navigation/native'
 import { AppContext, ThemeContext } from '../context'
-import { ThemedCard } from '../components'
+import { BadgeVectorIcon, ThemedCard } from '../components'
 import { RADIUS, SPACING, TYPOGRAPHY } from '../constants/layout'
 import { apiRequest } from '../api'
 
@@ -75,19 +75,6 @@ const RANK_BADGE: Record<RankTier, any> = {
   Platinum: require('../../assets/ranked/platnuim.png'),
   Diamond: require('../../assets/ranked/diomand.png'),
   Champion: require('../../assets/ranked/champion.png'),
-}
-
-const BADGE_ASSET: Record<BadgeId, any> = {
-  placed1st: require('../../assets/badges/placed1st.png'),
-  placed2nd: require('../../assets/badges/placed2nd.png'),
-  placed3rd: require('../../assets/badges/placed3rd.png'),
-  champion: require('../../assets/badges/champion.png'),
-  magician: require('../../assets/badges/magician.png'),
-  sweat: require('../../assets/badges/sweat.png'),
-  scholar: require('../../assets/badges/scholar.png'),
-  quick: require('../../assets/badges/quick.png'),
-  scientist: require('../../assets/badges/scientist.png'),
-  flawless: require('../../assets/badges/flawless.png'),
 }
 
 function formatEventDateLabel(eventDate: string | null): string {
@@ -222,10 +209,10 @@ export function PlayerInfoDetail() {
               {badges.length > 0 ? (
                 badges.map((badge, index) => (
                   <View key={`${badge.badgeId}-${badge.eventId}-${badge.awardedAt}-${index}`} style={styles.badgePlainItem}>
-                    <Image
-                      source={BADGE_ASSET[badge.badgeId]}
-                      style={styles.earnedBadgeImage}
-                      resizeMode="contain"
+                    <BadgeVectorIcon
+                      badgeId={badge.badgeId}
+                      size={48}
+                      color={theme.tintColor}
                     />
                   </View>
                 ))

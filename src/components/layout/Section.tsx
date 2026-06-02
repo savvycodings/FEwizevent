@@ -1,8 +1,10 @@
-import { ReactNode, useContext } from 'react'
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native'
-import { ThemeContext } from '../../context'
-import { SPACING, TYPOGRAPHY } from '../../constants/layout'
+import { ReactNode } from 'react'
+import { TouchableOpacity, View } from 'react-native'
+import { cn } from '@/lib/utils'
+import { Text } from '@/components/ui/text'
 import { Divider } from '../ui/Divider'
+import { ToolbarRow } from './ToolbarRow'
+import { rowGrow } from './PressableRow'
 
 interface SectionProps {
   title: string
@@ -28,74 +30,39 @@ export function Section({
   largeTitle = false,
   embedded = false,
 }: SectionProps) {
-  const { theme } = useContext(ThemeContext)
-  const styles = getStyles(theme, largeTitle)
-
   return (
     <View
-      style={[
-        styles.section,
-        embedded && styles.sectionEmbedded,
-        !embedded && compactTopSpacing && styles.sectionCompact,
-      ]}
+      className={cn(
+        !embedded && (compactTopSpacing ? 'mt-4' : 'mt-6'),
+        embedded && 'mt-0'
+      )}
     >
-      <View style={styles.headerBlock}>
-        <View style={styles.headerRow}>
-          <Text style={styles.title}>{title}</Text>
+      <View className="mb-3">
+        <ToolbarRow style={{ alignItems: 'flex-start' }}>
+          <Text
+            variant={largeTitle ? 'h3' : 'h4'}
+            style={rowGrow.text}
+            className="text-foreground"
+            numberOfLines={1}
+          >
+            {title}
+          </Text>
           {onPressSeeAll ? (
-            <TouchableOpacity onPress={onPressSeeAll}>
-              <Text style={styles.seeAll}>View All</Text>
+            <TouchableOpacity onPress={onPressSeeAll} style={rowGrow.end}>
+              <Text variant="muted" className="underline">
+                View All
+              </Text>
             </TouchableOpacity>
           ) : null}
-        </View>
-        {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
+        </ToolbarRow>
+        {subtitle ? (
+          <Text variant="muted" className="mt-1">
+            {subtitle}
+          </Text>
+        ) : null}
       </View>
       {showDivider ? <Divider spacing="sm" /> : null}
       {children}
     </View>
   )
-}
-
-const getStyles = (theme: any, largeTitle: boolean) => {
-  const titleSize = largeTitle ? TYPOGRAPHY.h3 : TYPOGRAPHY.h4
-  return StyleSheet.create({
-    section: {
-      marginTop: SPACING.sectionGap,
-    },
-    sectionCompact: {
-      marginTop: SPACING.lg,
-    },
-    sectionEmbedded: {
-      marginTop: 0,
-    },
-    headerBlock: {
-      marginBottom: SPACING.sectionTitleBottom,
-    },
-    headerRow: {
-      flexDirection: 'row',
-      alignItems: 'flex-start',
-      justifyContent: 'space-between',
-    },
-    title: {
-      color: theme.textColor,
-      fontFamily: theme.boldFont,
-      fontSize: titleSize,
-      flex: 1,
-      paddingRight: SPACING.md,
-      lineHeight: titleSize * 1.2,
-    },
-    subtitle: {
-      marginTop: SPACING.xs,
-      color: theme.mutedForegroundColor,
-      fontFamily: theme.regularFont,
-      fontSize: TYPOGRAPHY.bodySmall,
-      lineHeight: TYPOGRAPHY.bodySmall * 1.4,
-    },
-    seeAll: {
-      color: theme.mutedForegroundColor,
-      fontFamily: theme.semiBoldFont,
-      fontSize: TYPOGRAPHY.bodySmall,
-      textDecorationLine: 'underline',
-    },
-  })
 }

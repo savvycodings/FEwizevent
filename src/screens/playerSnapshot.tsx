@@ -1,7 +1,8 @@
 import { useCallback, useContext, useState } from 'react'
 import { Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native'
-import Ionicons from '@expo/vector-icons/Ionicons'
+import { AppIcon } from '../components'
+import { BRAND } from '../constants/brandColors'
 import { ThemeContext } from '../context'
 import { Divider, Section, Surface, ThemedCard } from '../components'
 import { RADIUS, SPACING, TYPOGRAPHY } from '../constants/layout'
@@ -133,7 +134,7 @@ export function PlayerSnapshot() {
               accessibilityRole="button"
               accessibilityLabel="Go back"
             >
-              <Ionicons name="arrow-back-outline" size={22} color="#000" />
+              <AppIcon name="arrow-back" size={22} color={BRAND.heroInk} />
             </Pressable>
             <Text style={styles.heroTitle} numberOfLines={2}>
               {displayName}
@@ -149,8 +150,8 @@ export function PlayerSnapshot() {
                   <QRCode
                     value={profileDeepLink}
                     size={QR_THUMB_SIZE}
-                    backgroundColor="#ffffff"
-                    color="#000000"
+                    backgroundColor={BRAND.qrBackground}
+                    color={BRAND.qrForeground}
                   />
                 </View>
               </Pressable>
@@ -231,8 +232,8 @@ export function PlayerSnapshot() {
                 <QRCode
                   value={profileDeepLink}
                   size={QR_MODAL_SIZE}
-                  backgroundColor="#ffffff"
-                  color="#000000"
+                  backgroundColor={BRAND.qrBackground}
+                  color={BRAND.qrForeground}
                 />
               </View>
               <Text style={styles.qrModalCaption}>Scan to view profile</Text>
@@ -291,7 +292,7 @@ const getStyles = (theme: any) =>
       padding: SPACING.xs,
     },
     heroTitle: {
-      color: '#000',
+      color: BRAND.heroInk,
       fontFamily: theme.boldFont,
       fontSize: TYPOGRAPHY.h2,
       flex: 1,
@@ -309,7 +310,7 @@ const getStyles = (theme: any) =>
     },
     qrThumbQuietZone: {
       padding: 3,
-      backgroundColor: '#ffffff',
+      backgroundColor: BRAND.qrBackground,
       borderRadius: RADIUS.sm,
     },
     surface: {
@@ -346,7 +347,7 @@ const getStyles = (theme: any) =>
     },
     qrModalQuietZone: {
       padding: SPACING.md,
-      backgroundColor: '#ffffff',
+      backgroundColor: BRAND.qrBackground,
       borderRadius: RADIUS.md,
     },
     qrModalCaption: {

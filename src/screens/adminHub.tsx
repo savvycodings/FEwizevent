@@ -1,9 +1,17 @@
 import { useContext } from 'react'
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
-import Ionicons from '@expo/vector-icons/Ionicons'
 import { ThemeContext } from '../context'
-import { ThemedCard, CardCaption } from '../components'
+import { AppIcon, ToolbarRow } from '../components'
+import { rowGrow } from '../components/layout/PressableRow'
 import { RADIUS, SPACING, TYPOGRAPHY } from '../constants/layout'
+
+const ACTIONS = [
+  { route: 'AdminCreate', icon: 'calendar' as const, title: 'Create events' },
+  { route: 'AdminAttendance', icon: 'list-checks' as const, title: 'Manage events' },
+  { route: 'AdminRedeem', icon: 'award' as const, title: 'Redeem prizes' },
+  { route: 'PlayerInfo', icon: 'users' as const, title: 'Player info' },
+  { route: 'RankingLeaderboard', icon: 'trophy' as const, title: 'Ranked leaderboard' },
+]
 
 export function AdminHub({ navigation }: { navigation: any }) {
   const { theme } = useContext(ThemeContext)
@@ -13,71 +21,26 @@ export function AdminHub({ navigation }: { navigation: any }) {
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
       <View style={styles.hero} />
       <View style={styles.surface}>
-        <Text style={styles.sectionTitle}>Manage</Text>
-
-        <Pressable onPress={() => navigation.navigate('AdminCreate')} style={styles.actionPressable}>
-          <ThemedCard premiumRim style={styles.actionCard}>
-            <CardCaption caption="Add new events and banners">
-              <View style={styles.actionRow}>
-                <View style={styles.actionIconWrap}>
-                  <Ionicons name="calendar-outline" size={22} color={theme.tintColor} />
-                </View>
-                <View style={styles.actionBody}>
-                  <Text style={styles.actionTitle}>Create events</Text>
-                </View>
-                <Ionicons name="chevron-forward-outline" size={20} color={theme.mutedForegroundColor} />
+        <Text style={styles.sectionTitle}>Admin</Text>
+        {ACTIONS.map((action) => (
+          <Pressable
+            key={action.route}
+            onPress={() => navigation.navigate(action.route)}
+            style={({ pressed }) => [styles.actionRow, pressed && styles.actionRowPressed]}
+          >
+            <ToolbarRow>
+              <View style={styles.actionIconWrap}>
+                <AppIcon name={action.icon} size={20} color={theme.tintColor} />
               </View>
-            </CardCaption>
-          </ThemedCard>
-        </Pressable>
-
-        <Pressable onPress={() => navigation.navigate('AdminAttendance')} style={styles.actionPressable}>
-          <ThemedCard style={styles.actionCard}>
-            <CardCaption caption="Take attendance and placements">
-              <View style={styles.actionRow}>
-                <View style={styles.actionIconWrap}>
-                  <Ionicons name="checkmark-done-outline" size={22} color={theme.tintColor} />
-                </View>
-                <View style={styles.actionBody}>
-                  <Text style={styles.actionTitle}>Attendance</Text>
-                </View>
-                <Ionicons name="chevron-forward-outline" size={20} color={theme.mutedForegroundColor} />
+              <Text style={[rowGrow.text, styles.actionTitle]} numberOfLines={1}>
+                {action.title}
+              </Text>
+              <View style={rowGrow.end}>
+                <AppIcon name="chevron-right" size={18} color={theme.mutedForegroundColor} />
               </View>
-            </CardCaption>
-          </ThemedCard>
-        </Pressable>
-
-        <Pressable onPress={() => navigation.navigate('PlayerInfo')} style={styles.actionPressable}>
-          <ThemedCard style={styles.actionCard}>
-            <CardCaption caption="View player account details">
-              <View style={styles.actionRow}>
-                <View style={styles.actionIconWrap}>
-                  <Ionicons name="people-outline" size={22} color={theme.tintColor} />
-                </View>
-                <View style={styles.actionBody}>
-                  <Text style={styles.actionTitle}>Player info</Text>
-                </View>
-                <Ionicons name="chevron-forward-outline" size={20} color={theme.mutedForegroundColor} />
-              </View>
-            </CardCaption>
-          </ThemedCard>
-        </Pressable>
-
-        <Pressable onPress={() => navigation.navigate('RankingLeaderboard')} style={styles.actionPressable}>
-          <ThemedCard style={styles.actionCard}>
-            <CardCaption caption="View rank tiers and XP standings">
-              <View style={styles.actionRow}>
-                <View style={styles.actionIconWrap}>
-                  <Ionicons name="trophy-outline" size={22} color={theme.tintColor} />
-                </View>
-                <View style={styles.actionBody}>
-                  <Text style={styles.actionTitle}>Ranked leaderboard</Text>
-                </View>
-                <Ionicons name="chevron-forward-outline" size={20} color={theme.mutedForegroundColor} />
-              </View>
-            </CardCaption>
-          </ThemedCard>
-        </Pressable>
+            </ToolbarRow>
+          </Pressable>
+        ))}
       </View>
     </ScrollView>
   )
@@ -105,41 +68,39 @@ const getStyles = (theme: any) =>
       backgroundColor: theme.backgroundColor,
       paddingHorizontal: SPACING.containerPadding,
       paddingTop: SPACING.xl,
+      gap: SPACING.sm,
     },
     sectionTitle: {
       color: theme.textColor,
       fontFamily: theme.boldFont,
       fontSize: TYPOGRAPHY.h4,
-      marginBottom: SPACING.md,
-    },
-    actionPressable: {
-      marginBottom: SPACING.md,
-    },
-    actionCard: {
-      alignItems: 'stretch',
+      marginBottom: SPACING.sm,
     },
     actionRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: SPACING.md,
+      borderWidth: 1.5,
+      borderColor: theme.borderColor,
+      borderRadius: RADIUS.lg,
+      backgroundColor: theme.cardBackground ?? theme.backgroundColor,
+      paddingHorizontal: SPACING.md,
+      paddingVertical: SPACING.md,
+      minHeight: 52,
+    },
+    actionRowPressed: {
+      opacity: 0.85,
     },
     actionIconWrap: {
-      width: 38,
-      height: 38,
+      width: 36,
+      height: 36,
       borderRadius: RADIUS.full,
-      borderWidth: 1,
+      borderWidth: 1.5,
       borderColor: theme.borderColor,
+      backgroundColor: theme.surfaceMuted ?? theme.cardBackground ?? theme.backgroundColor,
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: theme.backgroundColor,
-    },
-    actionBody: {
-      flex: 1,
     },
     actionTitle: {
       color: theme.textColor,
-      fontFamily: theme.boldFont,
+      fontFamily: theme.semiBoldFont,
       fontSize: TYPOGRAPHY.body,
-      textAlign: 'left',
     },
   })

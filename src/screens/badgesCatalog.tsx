@@ -1,14 +1,12 @@
 import { useCallback, useContext, useMemo, useState } from 'react'
-import { Image, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { ScrollView, StyleSheet, Text, View } from 'react-native'
 import { useFocusEffect } from '@react-navigation/native'
 import { AppContext, ThemeContext } from '../context'
-import { ThemedCard, CardCaption } from '../components'
+import { BadgeVectorIcon, ThemedCard } from '../components'
 import {
-  BADGE_ASSET,
   BADGE_AWARD_TEXT,
   BADGE_CATALOG_ORDER,
   BADGE_DISPLAY_TITLE,
-  BADGE_RANK_XP_NOTE,
   type BadgeId,
 } from '../data/badgesCatalog'
 import { RADIUS, SPACING, TYPOGRAPHY } from '../constants/layout'
@@ -53,7 +51,6 @@ export function BadgesCatalog() {
         id,
         title: BADGE_DISPLAY_TITLE[id],
         blurb: BADGE_AWARD_TEXT[id],
-        foot: BADGE_RANK_XP_NOTE[id],
         earned: earnedIds.has(id),
       })),
     [earnedIds]
@@ -63,26 +60,20 @@ export function BadgesCatalog() {
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
       {rows.map((row, index) => (
         <ThemedCard key={row.id} style={index === rows.length - 1 ? styles.cardLast : styles.card}>
-          <CardCaption caption={row.foot}>
-            <View style={styles.rowMain}>
-              <View style={styles.rowLeft}>
-                <Text style={styles.title}>{row.title}</Text>
-                <Text style={styles.subtitle}>{row.blurb}</Text>
-                <View style={styles.track}>
-                  <View
-                    style={[
-                      styles.trackFill,
-                      { width: row.earned ? '100%' : '14%' },
-                      !row.earned && styles.trackFillLocked,
-                    ]}
-                  />
-                </View>
-              </View>
-              <View style={styles.iconWrap}>
-                <Image source={BADGE_ASSET[row.id]} style={styles.badgeImage} resizeMode="contain" />
-              </View>
+          <View style={styles.rowMain}>
+            <View style={styles.rowLeft}>
+              <Text style={styles.title}>{row.title}</Text>
+              <Text style={styles.subtitle}>{row.blurb}</Text>
             </View>
-          </CardCaption>
+            <View style={styles.iconWrap}>
+              <BadgeVectorIcon
+                badgeId={row.id}
+                size={44}
+                color={row.earned ? theme.tintColor : theme.mutedForegroundColor}
+                opacity={row.earned ? 1 : 0.4}
+              />
+            </View>
+          </View>
         </ThemedCard>
       ))}
     </ScrollView>
@@ -128,29 +119,10 @@ const getStyles = (theme: any) =>
       fontSize: TYPOGRAPHY.caption,
       lineHeight: Math.round(TYPOGRAPHY.caption * 1.45),
     },
-    track: {
-      marginTop: SPACING.sm,
-      height: 8,
-      borderRadius: RADIUS.full,
-      backgroundColor: theme.borderColor,
-      overflow: 'hidden',
-    },
-    trackFill: {
-      height: '100%',
-      borderRadius: RADIUS.full,
-      backgroundColor: theme.tintColor,
-    },
-    trackFillLocked: {
-      opacity: 0.35,
-    },
     iconWrap: {
       width: 44,
       height: 44,
       alignItems: 'center',
       justifyContent: 'center',
-    },
-    badgeImage: {
-      width: 44,
-      height: 44,
     },
   })

@@ -1,14 +1,13 @@
-import { useContext } from 'react'
-import { StyleProp, StyleSheet, Text, View, ViewStyle } from 'react-native'
-import { ThemeContext } from '../../context'
-import { SPACING, TYPOGRAPHY } from '../../constants/layout'
+import { StyleProp, View, ViewStyle } from 'react-native'
+import { cn } from '@/lib/utils'
+import { Text } from './text'
 
 type EmptyStateProps = {
   message: string
   title?: string
-  /** Optional muted band behind copy — single surface, no second stroke. */
   variant?: 'plain' | 'mutedBand'
   style?: StyleProp<ViewStyle>
+  className?: string
 }
 
 export function EmptyState({
@@ -16,51 +15,26 @@ export function EmptyState({
   title,
   variant = 'plain',
   style,
+  className,
 }: EmptyStateProps) {
-  const { theme } = useContext(ThemeContext)
-  const styles = getStyles(theme, variant)
-
   return (
-    <View style={[styles.wrap, style]}>
-      {title ? <Text style={styles.title}>{title}</Text> : null}
-      <Text style={styles.message}>{message}</Text>
+    <View
+      className={cn(
+        'self-stretch',
+        variant === 'mutedBand' && 'bg-muted rounded-xl px-5 py-6',
+        variant === 'plain' && 'py-4',
+        className
+      )}
+      style={style}
+    >
+      {title ? (
+        <Text variant="small" className="text-foreground mb-2">
+          {title}
+        </Text>
+      ) : null}
+      <Text variant="muted" className="leading-6">
+        {message}
+      </Text>
     </View>
   )
-}
-
-function getStyles(theme: any, variant: 'plain' | 'mutedBand') {
-  const band =
-    variant === 'mutedBand'
-      ? {
-          backgroundColor: theme.surfaceMuted ?? theme.buttonBackground,
-          borderRadius: 12,
-          paddingVertical: SPACING.xl,
-          paddingHorizontal: SPACING.lg,
-        }
-      : {
-          paddingVertical: SPACING.lg,
-          paddingHorizontal: 0,
-        }
-
-  return StyleSheet.create({
-    wrap: {
-      alignSelf: 'stretch',
-      ...band,
-    },
-    title: {
-      color: theme.textColor,
-      fontFamily: theme.semiBoldFont,
-      fontSize: TYPOGRAPHY.bodySmall,
-      marginBottom: SPACING.sm,
-      lineHeight: TYPOGRAPHY.bodySmall * 1.35,
-      textAlign: 'left',
-    },
-    message: {
-      color: theme.mutedForegroundColor,
-      fontFamily: theme.regularFont,
-      fontSize: TYPOGRAPHY.body,
-      textAlign: 'left',
-      lineHeight: TYPOGRAPHY.body * 1.45,
-    },
-  })
 }

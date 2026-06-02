@@ -1,20 +1,20 @@
 import { ReactNode, useContext } from 'react'
-import { StyleProp, StyleSheet, View, ViewStyle } from 'react-native'
+import { StyleProp, View, ViewStyle } from 'react-native'
 import { ThemeContext } from '../../context'
-import { RADIUS, SPACING } from '../../constants/layout'
+import { cn } from '@/lib/utils'
+import { Card } from './card'
 import { PremiumRim } from './PremiumRim'
-import { Surface } from './Surface'
+import { RADIUS, SPACING } from '../../constants/layout'
 
 interface ThemedCardProps {
   children: ReactNode
   style?: StyleProp<ViewStyle>
-  /** Accent gradient rim — use sparingly (one focal card per screen). Default is a flat surface. */
   premiumRim?: boolean
 }
 
 export function ThemedCard({ children, style, premiumRim = false }: ThemedCardProps) {
   const { theme } = useContext(ThemeContext)
-  const styles = getStyles(theme)
+
   if (premiumRim) {
     return (
       <PremiumRim
@@ -23,16 +23,16 @@ export function ThemedCard({ children, style, premiumRim = false }: ThemedCardPr
         innerBackgroundColor={theme.cardBackground}
         style={style}
       >
-        <View style={styles.cardInner}>{children}</View>
+        <Card className="gap-0 border-0 bg-transparent py-0 shadow-none">
+          <View style={{ padding: SPACING.cardPadding }}>{children}</View>
+        </Card>
       </PremiumRim>
     )
   }
-  return <Surface style={style}>{children}</Surface>
-}
 
-const getStyles = (_theme: any) =>
-  StyleSheet.create({
-    cardInner: {
-      padding: SPACING.cardPadding,
-    },
-  })
+  return (
+    <Card className={cn('gap-0')} style={style}>
+      <View style={{ padding: SPACING.cardPadding }}>{children}</View>
+    </Card>
+  )
+}

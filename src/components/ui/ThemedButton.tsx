@@ -1,14 +1,11 @@
 import { ReactNode, useContext } from 'react'
-import {
-  StyleProp,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  ViewStyle,
-} from 'react-native'
+import { StyleProp, ViewStyle } from 'react-native'
 import { ThemeContext } from '../../context'
-import { RADIUS, SPACING, TYPOGRAPHY } from '../../constants/layout'
+import { cn } from '@/lib/utils'
+import { Button, type ButtonProps } from './button'
+import { Text } from './text'
 import { PremiumRim } from './PremiumRim'
+import { RADIUS } from '../../constants/layout'
 
 interface ThemedButtonProps {
   label: string
@@ -17,7 +14,17 @@ interface ThemedButtonProps {
   style?: StyleProp<ViewStyle>
   leftIcon?: ReactNode
   disabled?: boolean
+  /** Gradient accent rim — off by default; use standard bordered black fill. */
   premiumRim?: boolean
+}
+
+const variantMap: Record<
+  NonNullable<ThemedButtonProps['variant']>,
+  NonNullable<ButtonProps['variant']>
+> = {
+  primary: 'outline',
+  secondary: 'secondary',
+  outline: 'outline',
 }
 
 export function ThemedButton({
@@ -27,10 +34,38 @@ export function ThemedButton({
   style,
   leftIcon,
   disabled,
-  premiumRim = true,
+  premiumRim = false,
 }: ThemedButtonProps) {
   const { theme } = useContext(ThemeContext)
-  const styles = getStyles(theme)
+  const buttonVariant = variantMap[variant]
+
+  const button = (
+    <Button
+      onPress={onPress}
+      disabled={disabled}
+      variant={premiumRim ? 'ghost' : buttonVariant}
+      className={cn(
+        'w-full border-border bg-card',
+        premiumRim && 'border-0 bg-transparent shadow-none'
+      )}
+      style={!premiumRim ? style : undefined}
+    >
+      {leftIcon}
+      <Text
+        className={cn(
+          variant === 'primary' && !premiumRim && 'font-semibold text-primary',
+          premiumRim && variant === 'primary' && 'text-primary-foreground',
+          premiumRim && variant !== 'primary' && 'text-foreground'
+        )}
+      >
+        {label}
+      </Text>
+    </Button>
+  )
+
+  if (!premiumRim) {
+    return button
+  }
 
   const innerBg =
     variant === 'primary'
@@ -39,62 +74,6 @@ export function ThemedButton({
         ? theme.buttonBackground
         : 'transparent'
 
-  const buttonEl = (
-    <TouchableOpacity
-      onPress={onPress}
-      disabled={disabled}
-      activeOpacity={0.8}
-      style={[
-        styles.button,
-        variant === 'primary' && styles.primary,
-        variant === 'secondary' && styles.secondary,
-        variant === 'outline' && styles.outline,
-        premiumRim && styles.buttonFullWidth,
-        disabled && styles.disabled,
-      ]}
-    >
-      {leftIcon}
-      <Text
-        style={[
-          styles.label,
-          variant === 'primary' && styles.primaryLabel,
-          variant !== 'primary' && styles.secondaryLabel,
-        ]}
-      >
-        {label}
-      </Text>
-    </TouchableOpacity>
-  )
-
-  if (!premiumRim) {
-    return (
-      <TouchableOpacity
-        onPress={onPress}
-        disabled={disabled}
-        activeOpacity={0.8}
-        style={[
-          styles.button,
-          variant === 'primary' && styles.primary,
-          variant === 'secondary' && styles.secondary,
-          variant === 'outline' && styles.outline,
-          disabled && styles.disabled,
-          style,
-        ]}
-      >
-        {leftIcon}
-        <Text
-          style={[
-            styles.label,
-            variant === 'primary' && styles.primaryLabel,
-            variant !== 'primary' && styles.secondaryLabel,
-          ]}
-        >
-          {label}
-        </Text>
-      </TouchableOpacity>
-    )
-  }
-
   return (
     <PremiumRim
       borderRadius={RADIUS.full}
@@ -102,52 +81,7 @@ export function ThemedButton({
       innerBackgroundColor={innerBg}
       style={style}
     >
-      {buttonEl}
+      {button}
     </PremiumRim>
   )
 }
-
-const getStyles = (theme: any) =>
-  StyleSheet.create({
-    button: {
-      borderRadius: RADIUS.full,
-      paddingVertical: SPACING.md,
-      paddingHorizontal: SPACING.lg,
-      flexDirection: 'row',
-      justifyContent: 'center',
-      alignItems: 'center',
-      borderWidth: 1,
-    },
-    primary: {
-      backgroundColor: theme.tintColor,
-      borderColor: theme.tintColor,
-    },
-    secondary: {
-      backgroundColor: theme.buttonBackground,
-      borderColor: theme.borderColor,
-    },
-    outline: {
-      backgroundColor: 'transparent',
-      borderColor: theme.borderColor,
-    },
-    buttonNoBorder: {
-      borderWidth: 0,
-    },
-    buttonFullWidth: {
-      width: '100%',
-      alignSelf: 'stretch',
-    },
-    disabled: {
-      opacity: 0.5,
-    },
-    label: {
-      fontSize: TYPOGRAPHY.bodySmall,
-      fontFamily: theme.boldFont,
-    },
-    primaryLabel: {
-      color: theme.tintTextColor,
-    },
-    secondaryLabel: {
-      color: theme.textColor,
-    },
-  })

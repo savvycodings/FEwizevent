@@ -6,9 +6,11 @@ import {
   AccountManagement,
   Admin,
   AdminEventAttendance,
+  AdminEventManage,
   AdminPlayerAttendance,
   AdminRoundBoard,
   AdminHub,
+  AdminRedeem,
   EventPage,
   PlayerSnapshot,
   Events,
@@ -18,6 +20,7 @@ import {
   News,
   NewsPostScreen,
   Play,
+  Profile,
   RankingLeaderboard,
   PlayerInfo,
   PlayerInfoDetail,
@@ -26,8 +29,7 @@ import {
   AttendedEvents,
   PlayerSearch,
 } from './screens'
-import FeatherIcon from '@expo/vector-icons/Feather'
-import Ionicons from '@expo/vector-icons/Ionicons'
+import { AppIcon } from './components/ui/app-icon'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { AppContext, ThemeContext } from './context'
 import { SPACING, TYPOGRAPHY } from './constants/layout'
@@ -77,13 +79,13 @@ function TopHeader({
       <View style={styles.side}>
         {showBack ? (
           <TouchableOpacity onPress={onBack} hitSlop={8}>
-            <Ionicons name="arrow-back-outline" size={22} color={theme.backgroundColor} />
+            <AppIcon name="arrow-back" size={22} color={theme.backgroundColor} />
           </TouchableOpacity>
         ) : null}
       </View>
       {title ? <Text style={styles.title}>{title}</Text> : <View style={styles.titleSpacer} />}
       <View style={styles.side}>
-        <Ionicons name="apps-outline" size={20} color={theme.backgroundColor} />
+        <AppIcon name="layout-grid" size={20} color={theme.backgroundColor} />
       </View>
     </View>
   )
@@ -114,7 +116,7 @@ function Tabs() {
         component={Home}
         options={{
           title: 'Home',
-          tabBarIcon: ({ color, size }) => <FeatherIcon name="home" color={color} size={size} />,
+          tabBarIcon: ({ color, size }) => <AppIcon name="home" color={color} size={size} />,
         }}
       />
       <Tab.Screen
@@ -122,7 +124,7 @@ function Tabs() {
         component={Events}
         options={{
           title: 'Events',
-          tabBarIcon: ({ color, size }) => <FeatherIcon name="calendar" color={color} size={size} />,
+          tabBarIcon: ({ color, size }) => <AppIcon name="calendar" color={color} size={size} />,
         }}
       />
       <Tab.Screen
@@ -130,7 +132,15 @@ function Tabs() {
         component={Play}
         options={{
           title: 'Play!',
-          tabBarIcon: ({ color, size }) => <FeatherIcon name="shield" color={color} size={size} />,
+          tabBarIcon: ({ color, size }) => <AppIcon name="shield" color={color} size={size} />,
+        }}
+      />
+      <Tab.Screen
+        name="ProfileTab"
+        component={Profile}
+        options={{
+          title: 'Profile',
+          tabBarIcon: ({ color, size }) => <AppIcon name="trending-up" color={color} size={size} />,
         }}
       />
       <Tab.Screen
@@ -138,7 +148,7 @@ function Tabs() {
         component={Menu}
         options={{
           title: 'Menu',
-          tabBarIcon: ({ color, size }) => <FeatherIcon name="menu" color={color} size={size} />,
+          tabBarIcon: ({ color, size }) => <AppIcon name="menu" color={color} size={size} />,
         }}
       />
       <Tab.Screen
@@ -218,7 +228,35 @@ function Tabs() {
         options={{
           headerShown: true,
           header: ({ navigation }) => (
-            <TopHeader title="Attendance" showBack onBack={() => navigation.navigate('Admin')} />
+            <TopHeader title="Manage events" showBack onBack={() => navigation.navigate('Admin')} />
+          ),
+          tabBarButton: () => null,
+          tabBarItemStyle: { display: 'none' },
+        }}
+      />
+      <Tab.Screen
+        name="AdminRedeem"
+        component={AdminRedeem}
+        options={{
+          headerShown: true,
+          header: ({ navigation }) => (
+            <TopHeader title="Redeem prizes" showBack onBack={() => navigation.navigate('Admin')} />
+          ),
+          tabBarButton: () => null,
+          tabBarItemStyle: { display: 'none' },
+        }}
+      />
+      <Tab.Screen
+        name="AdminEventManage"
+        component={AdminEventManage}
+        options={{
+          headerShown: true,
+          header: ({ navigation }) => (
+            <TopHeader
+              title="Manage event"
+              showBack
+              onBack={() => navigation.navigate('AdminAttendance')}
+            />
           ),
           tabBarButton: () => null,
           tabBarItemStyle: { display: 'none' },
@@ -228,14 +266,7 @@ function Tabs() {
         name="AdminEventAttendance"
         component={AdminEventAttendance}
         options={{
-          headerShown: true,
-          header: ({ navigation }) => (
-            <TopHeader
-              title="Event attendance"
-              showBack
-              onBack={() => navigation.navigate('AdminAttendance')}
-            />
-          ),
+          headerShown: false,
           tabBarButton: () => null,
           tabBarItemStyle: { display: 'none' },
         }}
@@ -250,7 +281,7 @@ function Tabs() {
               title="Player attendance"
               showBack
               onBack={() =>
-                navigation.navigate('AdminEventAttendance', { event: (route as any).params?.event })
+                navigation.navigate('AdminEventManage', { event: (route as any).params?.event })
               }
             />
           ),
@@ -268,7 +299,7 @@ function Tabs() {
               title="Round board"
               showBack
               onBack={() =>
-                navigation.navigate('AdminEventAttendance', { event: (route as any).params?.event })
+                navigation.navigate('AdminEventManage', { event: (route as any).params?.event })
               }
             />
           ),

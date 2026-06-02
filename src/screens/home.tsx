@@ -13,22 +13,34 @@ import { useFocusEffect } from '@react-navigation/native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { StatusBar } from 'expo-status-bar'
 import { LinearGradient } from 'expo-linear-gradient'
-import Ionicons from '@expo/vector-icons/Ionicons'
 import { AppContext, ThemeContext } from '../context'
-import { Section, ThemedCard } from '../components'
+import {
+  AppIcon,
+  BadgeVectorIcon,
+  FeedEventCard,
+  MotionBadgeIcon,
+  RankProgressCard,
+  ScreenSurface,
+  Section,
+  StatTile,
+  RanksBadgesModal,
+} from '../components'
+import { CommunityDeckMetaSection } from '../components/content/CommunityDeckMetaSection'
+import { DeckPicker } from '../components/content/DeckPicker'
+import { BRAND } from '../constants/brandColors'
 import { RADIUS, SPACING, TYPOGRAPHY } from '../constants/layout'
 import { HOME_HERO_TOP_COLOR } from '../constants/homeHero'
 import { profile } from '../data/mockData'
-import {
-  BADGE_ASSET,
-  BADGE_AWARD_TEXT,
-  type BadgeId,
-} from '../data/badgesCatalog'
+import { BADGE_AWARD_TEXT, BADGE_DISPLAY_TITLE, type BadgeId } from '../data/badgesCatalog'
 import { apiRequest } from '../api'
+import { setCachedPlayerStats } from '../state/playerStatsCache'
 import QRCode from 'react-native-qrcode-svg'
 import { getPlayerProfileDeepLink } from '../utils/playerProfileLink'
+import { formatRankProgressFooter, xpRemainingToRank } from '../utils/rankProgressHint'
 
 const QR_MODAL_SIZE = 256
+const HOME_BADGE_COLUMNS = 4
+const HOME_BADGE_ICON_SIZE = 36
 
 interface HomeProps {
   navigation: any
@@ -40,6 +52,7 @@ type HomeFeedItem = {
   eventTitle: string
   markedAt: string
   placement?: number | null
+  deckId?: string | null
 }
 
 type RankSummary = {
@@ -102,7 +115,11 @@ export function Home({ navigation }: HomeProps) {
   const { currentUser } = useContext(AppContext)
   const insets = useSafeAreaInsets()
   const { width: screenWidth } = useWindowDimensions()
-  const badgeCellWidth = screenWidth / 3
+  const badgeCellWidth = useMemo(() => {
+    const contentWidth = screenWidth - SPACING.containerPadding * 2
+    const gap = SPACING.sm
+    return Math.floor((contentWidth - gap * (HOME_BADGE_COLUMNS - 1)) / HOME_BADGE_COLUMNS)
+  }, [screenWidth])
   const styles = getStyles(theme)
   const openAttendedEvents = useCallback(() => {
     navigation.navigate('AttendedEvents')
@@ -120,45 +137,81 @@ export function Home({ navigation }: HomeProps) {
   const scrollBottomPadding = SPACING['4xl'] + insets.bottom
 
   const [weekStreak, setWeekStreak] = useState(0)
+  const [gamesPlayed, setGamesPlayed] = useState(0)
   const [feed, setFeed] = useState<HomeFeedItem[]>([])
   const [homeLoading, setHomeLoading] = useState(false)
   const [rankSummary, setRankSummary] = useState<RankSummary>({ xp: 0, rank: 'Bronze' })
   const [earnedBadges, setEarnedBadges] = useState<EarnedBadge[]>([])
   const [selectedBadge, setSelectedBadge] = useState<EarnedBadge | null>(null)
   const [qrModalVisible, setQrModalVisible] = useState(false)
+  const [ranksBadgesModalVisible, setRanksBadgesModalVisible] = useState(false)
+  const [activeDeckId, setActiveDeckId] = useState<string | null>(null)
+  const [deckSaving, setDeckSaving] = useState(false)
 
   const loadHome = useCallback(async () => {
     if (!currentUser?.id) {
       setWeekStreak(0)
+      setGamesPlayed(0)
       setFeed([])
+      setActiveDeckId(null)
       return
     }
     try {
       setHomeLoading(true)
-      const [homeRes, rankRes] = await Promise.all([
-        apiRequest<{ weekStreak: number; feed: HomeFeedItem[] }>(
+      const [homeRes, rankRes, deckRes] = await Promise.all([
+        apiRequest<{ weekStreak: number; gamesPlayed?: number; feed: HomeFeedItem[] }>(
           `/auth/home-summary?userId=${currentUser.id}`
         ),
         apiRequest<{ user: { xp?: number; rank?: RankSummary['rank'] }; badges?: EarnedBadge[] }>(
           `/admin/users/${currentUser.id}/details`
         ),
+        apiRequest<{ activeDeckId: string | null }>(
+          `/auth/deck-profile?userId=${currentUser.id}`
+        ).catch(() => ({ activeDeckId: null })),
       ])
       setWeekStreak(homeRes.weekStreak ?? 0)
+      setGamesPlayed(Number(homeRes.gamesPlayed ?? 0))
       setFeed(Array.isArray(homeRes.feed) ? homeRes.feed : [])
-      setRankSummary({
-        xp: Number(rankRes.user?.xp ?? 0),
-        rank: (rankRes.user?.rank as RankSummary['rank']) || 'Bronze',
+      const xp = Number(rankRes.user?.xp ?? 0)
+      const rank = (rankRes.user?.rank as RankSummary['rank']) || 'Bronze'
+      setRankSummary({ xp, rank })
+      setCachedPlayerStats(currentUser.id, {
+        xp,
+        rank,
+        name: currentUser.name,
       })
       setEarnedBadges(Array.isArray(rankRes.badges) ? rankRes.badges : [])
+      setActiveDeckId(deckRes.activeDeckId ?? null)
     } catch {
       setWeekStreak(0)
+      setGamesPlayed(0)
       setFeed([])
       setRankSummary({ xp: 0, rank: 'Bronze' })
       setEarnedBadges([])
+      setActiveDeckId(null)
     } finally {
       setHomeLoading(false)
     }
   }, [currentUser?.id])
+
+  const saveActiveDeck = useCallback(
+    async (deckId: string) => {
+      if (!currentUser?.id) return
+      try {
+        setDeckSaving(true)
+        const res = await apiRequest<{ activeDeckId: string | null }>('/auth/active-deck', {
+          method: 'PATCH',
+          body: JSON.stringify({ userId: currentUser.id, deckId }),
+        })
+        setActiveDeckId(res.activeDeckId ?? deckId)
+      } catch {
+        /* keep previous selection */
+      } finally {
+        setDeckSaving(false)
+      }
+    },
+    [currentUser?.id]
+  )
 
   const currentRank = RANK_ORDER.includes(rankSummary.rank) ? rankSummary.rank : 'Bronze'
   const currentXp = Math.max(0, Number(rankSummary.xp || 0))
@@ -169,6 +222,8 @@ export function Home({ navigation }: HomeProps) {
   const xpIntoTier = Math.max(0, currentXp - currentRankMin)
   const tierSpan = Math.max(1, nextRankMin - currentRankMin)
   const progressPct = nextRank ? Math.max(0, Math.min(100, Math.round((xpIntoTier / tierSpan) * 100))) : 100
+  const xpToNextRank = nextRank ? xpRemainingToRank(currentXp, nextRankMin) : 0
+  const rankProgressFooter = formatRankProgressFooter(nextRank, xpToNextRank)
 
   useFocusEffect(
     useCallback(() => {
@@ -176,24 +231,41 @@ export function Home({ navigation }: HomeProps) {
     }, [loadHome])
   )
 
+  const earnedBadgeIds = useMemo(
+    () => new Set(earnedBadges.map((b) => b.badgeId)),
+    [earnedBadges]
+  )
+
+  const statColumnWidth = useMemo(() => {
+    const rowInner = screenWidth - SPACING.containerPadding * 2 - SPACING.sm * 2
+    return rowInner / 3
+  }, [screenWidth])
+
   const overviewItems = useMemo(
     () => [
       {
         id: 'streak',
-        label: 'Week streak',
+        label: 'Win streak',
         value: homeLoading ? '…' : String(weekStreak),
-        icon: require('../../assets/badges/sweat.png'),
+        badgeId: 'sweat' as BadgeId,
+        accent: theme.tintColor,
+      },
+      {
+        id: 'games',
+        label: 'Events played',
+        value: homeLoading ? '…' : String(gamesPlayed),
+        badgeId: 'quick' as BadgeId,
         accent: theme.tintColor,
       },
       {
         id: 'badges',
         label: 'Badges',
         value: homeLoading ? '…' : String(earnedBadges.length),
-        icon: BADGE_ASSET.champion,
+        badgeId: 'champion' as BadgeId,
         accent: theme.tintColor,
       },
     ],
-    [weekStreak, homeLoading, earnedBadges.length, theme.tintColor]
+    [weekStreak, gamesPlayed, homeLoading, earnedBadges.length, theme.tintColor]
   )
 
   const displayName = currentUser?.name || profile.trainerName
@@ -222,142 +294,175 @@ export function Home({ navigation }: HomeProps) {
               )}
             </View>
             <View style={styles.heroTextWrap}>
-              <Text style={styles.heroGreeting}>Welcome back</Text>
-              <View style={styles.heroNameRow}>
-                <Pressable
-                  onPress={() => profileDeepLink && setQrModalVisible(true)}
-                  disabled={!profileDeepLink}
-                  style={({ pressed }) => [
-                    styles.heroNamePressable,
-                    pressed && profileDeepLink && styles.heroNamePressed,
-                  ]}
-                  accessibilityRole="button"
-                  accessibilityLabel="Show my profile QR code"
-                >
-                  <Text style={styles.heroName} numberOfLines={1}>
-                    {displayName}
-                  </Text>
-                </Pressable>
-                <Pressable
-                  onPress={() => navigation.navigate('PlayerSearch')}
-                  style={({ pressed }) => [styles.heroSearchBtn, pressed && styles.heroSearchBtnPressed]}
-                  accessibilityRole="button"
-                  accessibilityLabel="Search players"
-                  hitSlop={8}
-                >
-                  <Ionicons name="search-outline" size={30} color="#000" />
-                </Pressable>
-              </View>
-              <View style={styles.rankPill}>
-                <Image source={RANK_BADGE[currentRank]} style={styles.rankPillIcon} resizeMode="contain" />
-                <Text style={styles.rankPillText}>
-                  {currentRank} · {homeLoading ? '…' : `${currentXp} XP`}
+              <Text style={styles.heroGreeting}>Wizard</Text>
+              <Pressable
+                onPress={() => profileDeepLink && setQrModalVisible(true)}
+                disabled={!profileDeepLink}
+                style={({ pressed }) => [
+                  styles.heroNamePressable,
+                  pressed && profileDeepLink && styles.heroNamePressed,
+                ]}
+                accessibilityRole="button"
+                accessibilityLabel="Show my profile QR code"
+              >
+                <Text style={styles.heroName} numberOfLines={1}>
+                  {displayName}
                 </Text>
+              </Pressable>
+              <View style={styles.heroPills}>
+                <View style={styles.rankPill}>
+                  <Image
+                    source={RANK_BADGE[currentRank]}
+                    style={styles.rankPillIcon}
+                    resizeMode="contain"
+                  />
+                  <Text style={styles.rankPillText}>
+                    {currentRank} · {homeLoading ? '…' : `${currentXp} XP`}
+                  </Text>
+                </View>
+                {currentUser?.id ? (
+                  <DeckPicker
+                    variant="hero"
+                    value={activeDeckId}
+                    onChange={saveActiveDeck}
+                    label="Current deck"
+                    showFieldLabel={false}
+                    placeholder="Choose deck"
+                    disabled={deckSaving || homeLoading}
+                  />
+                ) : null}
               </View>
             </View>
           </View>
+          <Pressable
+            onPress={() => navigation.navigate('PlayerSearch')}
+            style={({ pressed }) => [styles.heroSearchBtn, pressed && styles.heroSearchBtnPressed]}
+            accessibilityRole="button"
+            accessibilityLabel="Search players"
+            hitSlop={8}
+          >
+            <AppIcon name="search" size={26} color={BRAND.heroInk} />
+          </Pressable>
         </View>
         </View>
       </View>
 
-      <View style={styles.surface}>
+      <ScreenSurface>
         <View style={styles.statsRow}>
-          {overviewItems.map((item) => {
-            const inner = (
-              <View style={[styles.statCardInner, { borderColor: `${item.accent}55` }]}>
-                <Image source={item.icon} style={styles.statIconImage} resizeMode="contain" />
-                <Text style={styles.statValue}>{item.value}</Text>
-                <Text style={styles.statLabel}>{item.label}</Text>
-              </View>
-            )
-            if (item.id === 'badges') {
-              return (
-                <Pressable
-                  key={item.id}
-                  style={({ pressed }) => [styles.statCardWrap, pressed && styles.statCardPressed]}
-                  onPress={() => navigation.navigate('BadgesCatalog')}
-                  accessibilityRole="button"
-                  accessibilityLabel="View all badges"
-                >
-                  {inner}
-                </Pressable>
-              )
-            }
-            return (
-              <View key={item.id} style={styles.statCardWrap}>
-                {inner}
-              </View>
-            )
-          })}
-        </View>
-
-        <Section title="Rank progress" compactTopSpacing>
-          <ThemedCard premiumRim style={styles.rankCard}>
-            <View style={styles.rankHeaderRow}>
-              <View style={styles.rankTitleBlock}>
-                <Text style={styles.rankTierLabel}>{currentRank} tier</Text>
-                <Text style={styles.rankXpLabel}>
-                  {nextRank
-                    ? `${xpIntoTier} / ${tierSpan} XP to ${nextRank}`
-                    : `Champion maxed · ${currentXp} XP`}
-                </Text>
-              </View>
-              <Image source={RANK_BADGE[currentRank]} style={styles.rankBadgeImage} resizeMode="contain" />
-            </View>
-            <View style={styles.rankProgressTrack}>
-              <LinearGradient
-                colors={['#8FD3FF', '#4DA8E8']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={[styles.rankProgressFill, { width: `${progressPct}%` }]}
+          {overviewItems.map((item, index) => (
+            <View
+              key={item.id}
+              style={[
+                styles.statColumn,
+                { width: statColumnWidth },
+                index < overviewItems.length - 1 && styles.statColumnGap,
+              ]}
+            >
+              <StatTile
+                label={item.label}
+                value={item.value}
+                iconNode={
+                  <MotionBadgeIcon
+                    badgeId={item.badgeId}
+                    size={28}
+                    color={item.accent}
+                  />
+                }
+                accentColor={item.accent}
+                onPress={
+                  item.id === 'badges' ? () => setRanksBadgesModalVisible(true) : undefined
+                }
+                accessibilityLabel={
+                  item.id === 'badges' ? 'View ranks, badges, and rewards' : item.label
+                }
               />
             </View>
-            <Text style={styles.rankProgressPct}>{progressPct}% to next tier</Text>
-          </ThemedCard>
+          ))}
+        </View>
 
-          <Text style={styles.earnedBadgesTitle}>Badges earned</Text>
+        <Section title="Meta share" compactTopSpacing>
+          <CommunityDeckMetaSection />
+        </Section>
+
+        <Section title="Rank progress" compactTopSpacing>
+          <RankProgressCard
+            premiumRim
+            badgeSource={RANK_BADGE[currentRank]}
+            tierLabel={`${currentRank} tier`}
+            xpLabel={
+              nextRank
+                ? `${xpIntoTier} / ${tierSpan} XP to ${nextRank}`
+                : `Champion maxed · ${currentXp} XP`
+            }
+            progressPct={progressPct}
+            progressFooter={rankProgressFooter}
+          />
+        </Section>
+
+        <Section
+          title="Badges earned"
+          compactTopSpacing
+          onPressSeeAll={
+            earnedBadges.length > 0 ? () => setRanksBadgesModalVisible(true) : undefined
+          }
+        >
           {earnedBadges.length > 0 ? (
             <View style={styles.earnedBadgesGrid}>
-              {earnedBadges.map((badge, index) => (
-                <Pressable
-                  key={`${badge.badgeId}-${badge.eventId}-${badge.awardedAt}-${index}`}
-                  style={({ pressed }) => [
-                    styles.earnedBadgeCell,
-                    { width: badgeCellWidth },
-                    pressed && styles.earnedBadgePressed,
-                  ]}
-                  onPress={() => setSelectedBadge(badge)}
-                >
-                  <Image
-                    source={BADGE_ASSET[badge.badgeId]}
-                    style={{ width: badgeCellWidth, height: badgeCellWidth }}
-                    resizeMode="contain"
-                  />
-                </Pressable>
-              ))}
+              {[...earnedBadges]
+                .sort(
+                  (a, b) =>
+                    new Date(b.awardedAt).getTime() - new Date(a.awardedAt).getTime()
+                )
+                .map((badge, index) => (
+                  <Pressable
+                    key={`${badge.badgeId}-${badge.eventId}-${badge.awardedAt}-${index}`}
+                    style={({ pressed }) => [
+                      styles.earnedBadgeTile,
+                      { width: badgeCellWidth },
+                      pressed && styles.earnedBadgePressed,
+                    ]}
+                    onPress={() => setSelectedBadge(badge)}
+                    accessibilityLabel={BADGE_DISPLAY_TITLE[badge.badgeId]}
+                  >
+                    <View style={styles.earnedBadgeIconWrap}>
+                      <MotionBadgeIcon
+                        badgeId={badge.badgeId}
+                        size={HOME_BADGE_ICON_SIZE}
+                        color={theme.tintColor}
+                      />
+                    </View>
+                    <Text style={styles.earnedBadgeTitle} numberOfLines={1}>
+                      {BADGE_DISPLAY_TITLE[badge.badgeId]}
+                    </Text>
+                    {badge.eventTitle ? (
+                      <Text style={styles.earnedBadgeMeta} numberOfLines={1}>
+                        {badge.eventTitle}
+                      </Text>
+                    ) : null}
+                  </Pressable>
+                ))}
             </View>
           ) : (
             <View style={styles.emptyBadgesWrap}>
-              <Ionicons name="ribbon-outline" size={28} color={theme.mutedForegroundColor} />
-              <Text style={styles.noEarnedBadgesText}>No tournament badges yet. Compete to earn your first.</Text>
+              <AppIcon name="award" size={28} color={theme.mutedForegroundColor} />
+              <Text style={styles.noEarnedBadgesText}>No badges yet.</Text>
             </View>
           )}
         </Section>
 
         <Section
           title="Activity"
-          subtitle="Recent events you attended."
           onPressSeeAll={openAttendedEvents}
           compactTopSpacing
         >
           {!currentUser?.id ? (
             <View style={styles.feedEmptyCard}>
-              <Ionicons name="person-outline" size={24} color={theme.mutedForegroundColor} />
+              <AppIcon name="user" size={24} color={theme.mutedForegroundColor} />
               <Text style={styles.feedEmpty}>Sign in to see your activity.</Text>
             </View>
           ) : feed.length === 0 ? (
             <View style={styles.feedEmptyCard}>
-              <Ionicons name="pulse-outline" size={24} color={theme.mutedForegroundColor} />
+              <AppIcon name="activity" size={24} color={theme.mutedForegroundColor} />
               <Text style={styles.feedEmpty}>
                 When an admin marks you attended, your results will appear here.
               </Text>
@@ -368,35 +473,21 @@ export function Home({ navigation }: HomeProps) {
                 const place =
                   item.placement != null && Number(item.placement) >= 1 ? Number(item.placement) : null
                 return (
-                  <Pressable
+                  <FeedEventCard
                     key={item.id}
+                    title={item.eventTitle}
+                    timeLabel={formatRelativeTime(item.markedAt)}
+                    placementLabel={place != null ? `${ordinalPlacement(place)} place` : null}
+                    deckId={item.deckId}
                     onPress={() => openEventPage(item)}
-                    style={({ pressed }) => [styles.feedCardPressable, pressed && styles.feedCardPressed]}
-                    accessibilityRole="button"
-                    accessibilityLabel={`Open ${item.eventTitle}`}
-                  >
-                    <ThemedCard premiumRim={feedIndex === 0} style={styles.feedCard}>
-                      <View style={styles.feedCardHeader}>
-                        <View style={styles.feedIconBubble}>
-                          <Ionicons name="trophy-outline" size={16} color={theme.tintColor} />
-                        </View>
-                        <Text style={styles.feedTime}>{formatRelativeTime(item.markedAt)}</Text>
-                      </View>
-                      <Text style={styles.feedTitle}>{item.eventTitle}</Text>
-                      <Text style={styles.feedSubtitle}>Marked attended</Text>
-                      {place != null ? (
-                        <View style={styles.placementChip}>
-                          <Text style={styles.placementChipText}>{ordinalPlacement(place)} place</Text>
-                        </View>
-                      ) : null}
-                    </ThemedCard>
-                  </Pressable>
+                    premiumRim={feedIndex === 0}
+                  />
                 )
               })}
             </View>
           )}
         </Section>
-      </View>
+      </ScreenSurface>
       </ScrollView>
 
       <Modal
@@ -413,14 +504,19 @@ export function Home({ navigation }: HomeProps) {
                   colors={['rgba(143, 211, 255, 0.25)', 'rgba(143, 211, 255, 0.05)']}
                   style={styles.badgeModalGlow}
                 >
-                  <Image
-                    source={BADGE_ASSET[selectedBadge.badgeId]}
+                  <MotionBadgeIcon
+                    badgeId={selectedBadge.badgeId}
+                    size={108}
+                    color={theme.tintColor}
                     style={styles.badgeModalImage}
-                    resizeMode="contain"
                   />
                 </LinearGradient>
-                <Text style={styles.badgeModalTitle}>Badge unlocked</Text>
-                <Text style={styles.badgeModalText}>{BADGE_AWARD_TEXT[selectedBadge.badgeId]}</Text>
+                <Text style={styles.badgeModalTitle}>
+                  {BADGE_DISPLAY_TITLE[selectedBadge.badgeId]}
+                </Text>
+                <Text style={styles.badgeModalText}>
+                  {BADGE_AWARD_TEXT[selectedBadge.badgeId]}
+                </Text>
                 {selectedBadge.eventTitle ? (
                   <Text style={styles.badgeModalEventText}>{selectedBadge.eventTitle}</Text>
                 ) : null}
@@ -429,6 +525,14 @@ export function Home({ navigation }: HomeProps) {
           </Pressable>
         </Pressable>
       </Modal>
+
+      <RanksBadgesModal
+        visible={ranksBadgesModalVisible}
+        onClose={() => setRanksBadgesModalVisible(false)}
+        userId={currentUser?.id}
+        currentXp={currentXp}
+        earnedBadgeIds={earnedBadgeIds}
+      />
 
       <Modal
         visible={qrModalVisible}
@@ -444,8 +548,8 @@ export function Home({ navigation }: HomeProps) {
                   <QRCode
                     value={profileDeepLink}
                     size={QR_MODAL_SIZE}
-                    backgroundColor="#ffffff"
-                    color="#000000"
+                    backgroundColor={BRAND.qrBackground}
+                    color={BRAND.qrForeground}
                   />
                 </View>
                 <Text style={styles.qrModalCaption}>Scan to view profile</Text>
@@ -489,36 +593,42 @@ const getStyles = (theme: any) =>
       flexGrow: 1,
     },
     heroTopRow: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      justifyContent: 'space-between',
+      gap: SPACING.sm,
       zIndex: 1,
     },
     heroIdentityRow: {
+      flex: 1,
       flexDirection: 'row',
       alignItems: 'center',
       gap: SPACING.md,
       minWidth: 0,
-    },
-    heroNameRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: SPACING.sm,
-      marginTop: 2,
+      paddingRight: SPACING.xs,
     },
     heroSearchBtn: {
-      width: 40,
-      height: 40,
+      width: 44,
+      height: 44,
       alignItems: 'center',
       justifyContent: 'center',
       flexShrink: 0,
+      marginTop: -SPACING.xs,
     },
     heroSearchBtnPressed: {
       opacity: 0.85,
     },
     heroGreeting: {
-      color: 'rgba(0,0,0,0.65)',
-      fontFamily: theme.mediumFont,
+      color: BRAND.heroMuted,
+      fontFamily: theme.semiBoldFont,
       fontSize: TYPOGRAPHY.bodySmall,
-      letterSpacing: 0.3,
+      letterSpacing: 0.8,
       textTransform: 'uppercase',
+    },
+    heroPills: {
+      marginTop: SPACING.sm,
+      gap: SPACING.xs,
+      alignItems: 'flex-start',
     },
     heroTextWrap: {
       flex: 1,
@@ -526,9 +636,9 @@ const getStyles = (theme: any) =>
     avatarRing: {
       padding: 3,
       borderRadius: 36,
-      backgroundColor: 'rgba(255,255,255,0.85)',
+      backgroundColor: BRAND.heroRing,
       borderWidth: 2,
-      borderColor: 'rgba(0,0,0,0.12)',
+      borderColor: BRAND.heroBorder,
     },
     heroAvatar: {
       width: 60,
@@ -541,7 +651,7 @@ const getStyles = (theme: any) =>
       borderRadius: 30,
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: '#000',
+      backgroundColor: BRAND.heroInk,
     },
     heroAvatarInitial: {
       color: theme.tintColor,
@@ -549,14 +659,15 @@ const getStyles = (theme: any) =>
       fontSize: TYPOGRAPHY.h3,
     },
     heroNamePressable: {
-      flex: 1,
-      minWidth: 0,
+      alignSelf: 'flex-start',
+      maxWidth: '100%',
+      marginTop: 2,
     },
     heroNamePressed: {
       opacity: 0.65,
     },
     heroName: {
-      color: '#000',
+      color: BRAND.heroInk,
       fontFamily: theme.boldFont,
       fontSize: TYPOGRAPHY.h2,
       letterSpacing: -0.3,
@@ -566,134 +677,77 @@ const getStyles = (theme: any) =>
       alignItems: 'center',
       alignSelf: 'flex-start',
       gap: SPACING.xs,
-      marginTop: SPACING.sm,
       paddingVertical: SPACING.xs,
       paddingHorizontal: SPACING.sm,
       borderRadius: RADIUS.full,
       backgroundColor: 'rgba(0,0,0,0.12)',
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.12,
+      shadowRadius: 4,
+      elevation: 3,
     },
     rankPillIcon: {
       width: 18,
       height: 18,
     },
     rankPillText: {
-      color: '#000',
+      color: BRAND.heroInk,
       fontFamily: theme.semiBoldFont,
       fontSize: TYPOGRAPHY.caption,
-    },
-    surface: {
-      marginTop: -SPACING['2xl'],
-      borderTopLeftRadius: RADIUS.xl,
-      borderTopRightRadius: RADIUS.xl,
-      backgroundColor: theme.backgroundColor,
-      paddingHorizontal: SPACING.containerPadding,
-      paddingTop: SPACING.xl,
     },
     statsRow: {
       flexDirection: 'row',
-      gap: SPACING.md,
+      alignItems: 'stretch',
+      width: '100%',
       marginBottom: SPACING.sm,
     },
-    statCardWrap: {
-      flex: 1,
+    statColumn: {
+      minWidth: 0,
     },
-    statCardPressed: {
-      opacity: 0.92,
-      transform: [{ scale: 0.98 }],
-    },
-    statCardInner: {
-      borderRadius: RADIUS.lg,
-      borderWidth: 1,
-      backgroundColor: theme.cardBackground,
-      padding: SPACING.md,
-      minHeight: 128,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    statIconImage: {
-      width: 32,
-      height: 32,
-      marginBottom: SPACING.sm,
-    },
-    statValue: {
-      color: theme.textColor,
-      fontFamily: theme.boldFont,
-      fontSize: TYPOGRAPHY.h2,
-      letterSpacing: -0.5,
-      textAlign: 'center',
-    },
-    statLabel: {
-      color: theme.textColor,
-      fontFamily: theme.semiBoldFont,
-      fontSize: TYPOGRAPHY.bodySmall,
-      marginTop: 2,
-      textAlign: 'center',
-    },
-    rankCard: {
-      marginBottom: SPACING.md,
-    },
-    rankHeaderRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      gap: SPACING.md,
-      marginBottom: SPACING.md,
-    },
-    rankTitleBlock: {
-      flex: 1,
-    },
-    rankTierLabel: {
-      color: theme.textColor,
-      fontFamily: theme.boldFont,
-      fontSize: TYPOGRAPHY.h4,
-    },
-    rankXpLabel: {
-      color: theme.mutedForegroundColor,
-      fontFamily: theme.regularFont,
-      fontSize: TYPOGRAPHY.bodySmall,
-      marginTop: SPACING.xs,
-    },
-    rankBadgeImage: {
-      width: 44,
-      height: 44,
-    },
-    rankProgressTrack: {
-      height: 12,
-      borderRadius: RADIUS.full,
-      backgroundColor: theme.borderColor,
-      overflow: 'hidden',
-    },
-    rankProgressFill: {
-      height: '100%',
-      borderRadius: RADIUS.full,
-      minWidth: 8,
-    },
-    rankProgressPct: {
-      marginTop: SPACING.sm,
-      color: theme.mutedForegroundColor,
-      fontFamily: theme.mediumFont,
-      fontSize: TYPOGRAPHY.caption,
-      textAlign: 'right',
-    },
-    earnedBadgesTitle: {
-      marginTop: SPACING.xs,
-      marginBottom: SPACING.sm,
-      color: theme.textColor,
-      fontFamily: theme.boldFont,
-      fontSize: TYPOGRAPHY.body,
+    statColumnGap: {
+      marginRight: SPACING.sm,
     },
     earnedBadgesGrid: {
       flexDirection: 'row',
       flexWrap: 'wrap',
-      justifyContent: 'flex-start',
-      marginHorizontal: -SPACING.containerPadding,
+      gap: SPACING.sm,
     },
-    earnedBadgeCell: {
+    earnedBadgeTile: {
+      borderWidth: 1,
+      borderColor: theme.borderColor,
+      borderRadius: RADIUS.md,
+      backgroundColor: theme.cardBackground,
+      paddingHorizontal: SPACING.xs,
+      paddingTop: SPACING.sm,
+      paddingBottom: SPACING.xs,
+      alignItems: 'center',
+      minHeight: 88,
+    },
+    earnedBadgeIconWrap: {
+      width: HOME_BADGE_ICON_SIZE + 8,
+      height: HOME_BADGE_ICON_SIZE + 8,
       alignItems: 'center',
       justifyContent: 'center',
+      marginBottom: SPACING.xs,
+    },
+    earnedBadgeTitle: {
+      width: '100%',
+      textAlign: 'center',
+      color: theme.textColor,
+      fontFamily: theme.semiBoldFont,
+      fontSize: TYPOGRAPHY.caption,
+    },
+    earnedBadgeMeta: {
+      width: '100%',
+      marginTop: 2,
+      textAlign: 'center',
+      color: theme.mutedForegroundColor,
+      fontFamily: theme.regularFont,
+      fontSize: TYPOGRAPHY.caption - 1,
     },
     earnedBadgePressed: {
-      opacity: 0.9,
+      opacity: 0.88,
     },
     emptyBadgesWrap: {
       alignItems: 'center',
@@ -710,60 +764,6 @@ const getStyles = (theme: any) =>
     },
     feedList: {
       gap: SPACING.md,
-    },
-    feedCardPressable: {
-      width: '100%',
-    },
-    feedCardPressed: {
-      opacity: 0.92,
-    },
-    feedCard: {
-      width: '100%',
-    },
-    feedCardHeader: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      marginBottom: SPACING.sm,
-    },
-    feedIconBubble: {
-      width: 32,
-      height: 32,
-      borderRadius: 16,
-      backgroundColor: 'rgba(143, 211, 255, 0.15)',
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    feedTime: {
-      color: theme.mutedForegroundColor,
-      fontFamily: theme.mediumFont,
-      fontSize: TYPOGRAPHY.caption,
-    },
-    feedTitle: {
-      color: theme.textColor,
-      fontFamily: theme.boldFont,
-      fontSize: TYPOGRAPHY.h4,
-    },
-    feedSubtitle: {
-      color: theme.mutedForegroundColor,
-      fontFamily: theme.regularFont,
-      fontSize: TYPOGRAPHY.bodySmall,
-      marginTop: SPACING.xs,
-    },
-    placementChip: {
-      alignSelf: 'flex-start',
-      marginTop: SPACING.sm,
-      paddingVertical: SPACING.xs,
-      paddingHorizontal: SPACING.sm,
-      borderRadius: RADIUS.full,
-      backgroundColor: 'rgba(143, 211, 255, 0.18)',
-      borderWidth: 1,
-      borderColor: 'rgba(143, 211, 255, 0.35)',
-    },
-    placementChipText: {
-      color: theme.tintColor,
-      fontFamily: theme.semiBoldFont,
-      fontSize: TYPOGRAPHY.caption,
     },
     feedEmptyCard: {
       alignItems: 'center',
@@ -849,7 +849,7 @@ const getStyles = (theme: any) =>
     },
     qrModalQuietZone: {
       padding: SPACING.md,
-      backgroundColor: '#ffffff',
+      backgroundColor: BRAND.qrBackground,
       borderRadius: RADIUS.md,
     },
     qrModalCaption: {

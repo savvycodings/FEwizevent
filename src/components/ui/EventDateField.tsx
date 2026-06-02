@@ -9,7 +9,8 @@ import {
   ViewStyle,
 } from 'react-native'
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker'
-import Ionicons from '@expo/vector-icons/Ionicons'
+import { AppIcon } from './app-icon'
+import { PressableRow, rowGrow } from '@/components/layout/PressableRow'
 import { ThemeContext } from '../../context'
 import { RADIUS, SPACING, TYPOGRAPHY } from '../../constants/layout'
 
@@ -93,18 +94,24 @@ export function EventDateField({
         </View>
       ) : (
         <>
-          <Pressable
+          <PressableRow
             style={styles.trigger}
             onPress={openPicker}
             accessibilityRole="button"
             accessibilityLabel="Choose event date"
           >
-            <Ionicons name="calendar-outline" size={20} color={theme.tintColor} />
-            <Text style={[styles.triggerText, !value && styles.triggerPlaceholder]}>
+            <AppIcon name="calendar" size={20} color={theme.tintColor} />
+            <Text
+              style={[rowGrow.text, styles.triggerText, !value && styles.triggerPlaceholder]}
+              numberOfLines={1}
+              ellipsizeMode="tail"
+            >
               {formatPickerLabel(value)}
             </Text>
-            <Ionicons name="chevron-down-outline" size={18} color={theme.mutedForegroundColor} />
-          </Pressable>
+            <View style={rowGrow.end}>
+              <AppIcon name="chevron-down" size={18} color={theme.mutedForegroundColor} />
+            </View>
+          </PressableRow>
           {showAndroidPicker ? (
             <DateTimePicker
               value={pickerDate}
@@ -141,18 +148,14 @@ const getStyles = (theme: any) =>
       marginBottom: SPACING.xs,
     },
     trigger: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: SPACING.sm,
       borderColor: theme.borderColor,
-      borderWidth: 1,
+      borderWidth: 1.5,
       borderRadius: RADIUS.md,
       paddingHorizontal: SPACING.md,
       paddingVertical: SPACING.md,
       backgroundColor: theme.cardBackground ?? theme.backgroundColor,
     },
     triggerText: {
-      flex: 1,
       color: theme.textColor,
       fontFamily: theme.regularFont,
       fontSize: TYPOGRAPHY.body,
@@ -165,7 +168,7 @@ const getStyles = (theme: any) =>
       borderColor: theme.borderColor,
       borderRadius: RADIUS.md,
       overflow: 'hidden',
-      backgroundColor: theme.cardBackground ?? theme.backgroundColor,
+      backgroundColor: theme.backgroundColor,
     },
     iosPicker: {
       alignSelf: 'stretch',

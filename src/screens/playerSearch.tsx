@@ -6,13 +6,14 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from 'react-native'
 import { useFocusEffect } from '@react-navigation/native'
-import Ionicons from '@expo/vector-icons/Ionicons'
+import { AppIcon, ToolbarRow } from '../components'
+import { rowGrow } from '../components/layout/PressableRow'
+import { BRAND } from '../constants/brandColors'
 import { ThemeContext } from '../context'
-import { Surface } from '../components'
+import { SearchField, Surface } from '../components'
 import { RADIUS, SPACING, TYPOGRAPHY } from '../constants/layout'
 import { apiRequest } from '../api'
 
@@ -99,19 +100,17 @@ export function PlayerSearch({ navigation }: { navigation: any }) {
       <View style={styles.hero} />
 
       <View style={styles.surface}>
-        <View style={styles.searchWrap}>
-          <Ionicons name="search-outline" size={18} color={theme.mutedForegroundColor} />
-          <TextInput
+        <Surface padding="none" className="mb-4 border-0 bg-transparent shadow-none">
+          <SearchField
             value={query}
             onChangeText={setQuery}
-            style={styles.searchInput}
             placeholder="Search players"
-            placeholderTextColor={theme.mutedForegroundColor}
             autoCapitalize="none"
             autoCorrect={false}
             returnKeyType="search"
+            containerClassName="rounded-xl border border-border bg-card px-3"
           />
-        </View>
+        </Surface>
 
         {error ? <Text style={styles.errorText}>{error}</Text> : null}
         {hint ? <Text style={styles.hintText}>{hint}</Text> : null}
@@ -129,7 +128,7 @@ export function PlayerSearch({ navigation }: { navigation: any }) {
                 accessibilityLabel={`View stats for ${player.name}`}
               >
                 <Surface style={[styles.card, index === 0 && query.trim().length >= 2 ? styles.cardFeatured : null]} padding="lg">
-                  <View style={styles.cardRow}>
+                  <ToolbarRow>
                     {player.profileImageUrl ? (
                       <Image source={{ uri: player.profileImageUrl }} style={styles.avatar} />
                     ) : (
@@ -141,13 +140,15 @@ export function PlayerSearch({ navigation }: { navigation: any }) {
                       <Text style={styles.playerName} numberOfLines={1}>
                         {player.name}
                       </Text>
-                      <Text style={styles.playerMeta}>
+                      <Text style={styles.playerMeta} numberOfLines={1}>
                         {player.rank} · {player.xp} XP
                       </Text>
                     </View>
                     <Image source={rankBadge} style={styles.rankIcon} resizeMode="contain" />
-                    <Ionicons name="chevron-forward" size={18} color={theme.mutedForegroundColor} />
-                  </View>
+                    <View style={rowGrow.end}>
+                      <AppIcon name="chevron-right" size={18} color={theme.mutedForegroundColor} />
+                    </View>
+                  </ToolbarRow>
                 </Surface>
               </Pressable>
             )
@@ -229,11 +230,6 @@ const getStyles = (theme: any) =>
       borderColor: theme.tintColor,
       borderWidth: 1.5,
     },
-    cardRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: SPACING.md,
-    },
     avatar: {
       width: 44,
       height: 44,
@@ -243,7 +239,7 @@ const getStyles = (theme: any) =>
       width: 44,
       height: 44,
       borderRadius: 22,
-      backgroundColor: '#000',
+      backgroundColor: BRAND.heroInk,
       alignItems: 'center',
       justifyContent: 'center',
     },

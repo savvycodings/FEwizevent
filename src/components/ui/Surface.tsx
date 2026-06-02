@@ -1,60 +1,44 @@
-import { ReactNode, useContext } from 'react'
-import { StyleProp, StyleSheet, View, ViewStyle } from 'react-native'
-import { ThemeContext } from '../../context'
-import { RADIUS, SPACING } from '../../constants/layout'
+import { ReactNode } from 'react'
+import { StyleProp, ViewStyle } from 'react-native'
+import { cn } from '@/lib/utils'
+import { Card } from './card'
 
 type SurfaceVariant = 'default' | 'muted' | 'ghost'
+type SurfacePadding = 'default' | 'none' | 'sm' | 'lg'
 
 type SurfaceProps = {
   children: ReactNode
   variant?: SurfaceVariant
   style?: StyleProp<ViewStyle>
-  padding?: 'default' | 'none' | 'sm' | 'lg'
+  padding?: SurfacePadding
+  className?: string
 }
 
-const paddingMap = {
-  default: SPACING.cardPadding,
-  none: 0,
-  sm: SPACING.md,
-  lg: SPACING.lg,
-} as const
+const paddingClass: Record<SurfacePadding, string> = {
+  none: 'gap-0 p-0',
+  sm: 'gap-0 p-3',
+  default: 'gap-0 p-4',
+  lg: 'gap-0 p-5',
+}
 
 export function Surface({
   children,
   variant = 'default',
   style,
   padding = 'default',
+  className,
 }: SurfaceProps) {
-  const { theme } = useContext(ThemeContext)
-  const pv = paddingMap[padding]
-  const bg =
-    variant === 'muted'
-      ? theme.surfaceMuted ?? theme.buttonBackground
-      : variant === 'ghost'
-        ? 'transparent'
-        : theme.cardBackground
-  const borderW = variant === 'ghost' ? 0 : StyleSheet.hairlineWidth * 2
-
   return (
-    <View
-      style={[
-        styles.base,
-        {
-          backgroundColor: bg,
-          borderWidth: borderW,
-          borderColor: variant === 'ghost' ? 'transparent' : theme.borderColor,
-          padding: pv,
-        },
-        style,
-      ]}
+    <Card
+      className={cn(
+        paddingClass[padding],
+        variant === 'muted' && 'border-border bg-card border',
+        variant === 'ghost' && 'border-0 bg-transparent shadow-none',
+        className
+      )}
+      style={style}
     >
       {children}
-    </View>
+    </Card>
   )
 }
-
-const styles = StyleSheet.create({
-  base: {
-    borderRadius: RADIUS.lg,
-  },
-})

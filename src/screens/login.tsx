@@ -36,7 +36,7 @@ export function Login({ navigation }: { navigation: any }) {
       </View>
 
       <View style={styles.surface}>
-        <ThemedCard premiumRim>
+        <ThemedCard>
           <Text style={styles.title}>Log In</Text>
           <TextInput
             style={styles.input}
@@ -108,8 +108,9 @@ const getStyles = (theme: any) =>
     },
     input: {
       borderColor: theme.borderColor,
-      borderWidth: 1,
+      borderWidth: 1.5,
       borderRadius: RADIUS.md,
+      backgroundColor: theme.cardBackground ?? theme.backgroundColor,
       color: theme.textColor,
       paddingHorizontal: SPACING.md,
       paddingVertical: SPACING.md,

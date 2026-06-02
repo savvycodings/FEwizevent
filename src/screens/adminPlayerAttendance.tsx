@@ -1,29 +1,13 @@
 import { useCallback, useContext, useEffect, useMemo, useState } from 'react'
-import { Alert, Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native'
+import { Alert, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native'
-import Ionicons from '@expo/vector-icons/Ionicons'
+import { AppIcon, BadgeVectorIcon } from '../components'
 import { ThemeContext } from '../context'
-import { ThemedButton, ThemedCard } from '../components'
+import { Input, ThemedButton, ThemedCard } from '../components'
+import { DeckPicker } from '../components/content/DeckPicker'
 import { RADIUS, SPACING, TYPOGRAPHY } from '../constants/layout'
 import { apiRequest } from '../api'
-import { BADGE_AWARD_TEXT, BADGE_DISPLAY_TITLE, type BadgeId } from '../data/badgesCatalog'
-import {
-  type EventMatch,
-  focalOutcome,
-  matchForFocalRound,
-  opponentIdFromMatch,
-  opponentNameFromMatch,
-  optimisticMatchFromResult,
-  removeFocalRoundMatch,
-  replaceFocalRoundMatches,
-  suggestOpponentFromPreviousRound,
-} from '../utils/matchUtils'
-import {
-  canPlacementDown,
-  canPlacementUp,
-  nextPlacementDown,
-  nextPlacementUp,
-} from '../utils/placementUtils'
+import { BADGE_DISPLAY_TITLE, type BadgeId } from '../data/badgesCatalog'
 
 type User = {
   id: number
@@ -47,28 +31,21 @@ type PlacementBoardRow = {
   userEmail: string
   attended: boolean
   placement: number | null
+  deckId?: string | null
+  suggestedDeckId?: string | null
 }
 
 type ManualBadgeId = Exclude<BadgeId, 'placed1st' | 'placed2nd' | 'placed3rd'>
 
-const BADGES_TO_AWARD: Array<{ id: ManualBadgeId; icon: number }> = [
-  { id: 'champion', icon: require('../../assets/badges/champion.png') },
-  { id: 'magician', icon: require('../../assets/badges/magician.png') },
-  { id: 'sweat', icon: require('../../assets/badges/sweat.png') },
-  { id: 'scholar', icon: require('../../assets/badges/scholar.png') },
-  { id: 'quick', icon: require('../../assets/badges/quick.png') },
-  { id: 'scientist', icon: require('../../assets/badges/scientist.png') },
-  { id: 'flawless', icon: require('../../assets/badges/flawless.png') },
+const BADGES_TO_AWARD: ManualBadgeId[] = [
+  'champion',
+  'magician',
+  'sweat',
+  'scholar',
+  'quick',
+  'scientist',
+  'flawless',
 ]
-
-function ordinalPlacement(n: number): string {
-  const j = n % 10
-  const k = n % 100
-  if (j === 1 && k !== 11) return `${n}st`
-  if (j === 2 && k !== 12) return `${n}nd`
-  if (j === 3 && k !== 13) return `${n}rd`
-  return `${n}th`
-}
 
 function formatEventDateLabel(eventDate: string | null): string {
   if (!eventDate) return 'Date TBA'
@@ -97,14 +74,10 @@ export function AdminPlayerAttendance() {
   const [attendance, setAttendance] = useState<Attendance[]>([])
   const [earnedBadges, setEarnedBadges] = useState<EarnedBadge[]>([])
   const [placementBoard, setPlacementBoard] = useState<PlacementBoardRow[]>([])
-  const [placementBoardOpen, setPlacementBoardOpen] = useState(false)
   const [scheduledRounds, setScheduledRounds] = useState(0)
   const [useMatchTracking, setUseMatchTracking] = useState(false)
-  const [eventMatches, setEventMatches] = useState<EventMatch[]>([])
-  const [roundQuery, setRoundQuery] = useState<Record<number, string>>({})
-  const [debouncedRoundQuery, setDebouncedRoundQuery] = useState<Record<number, string>>({})
-  const [pickedOpponentId, setPickedOpponentId] = useState<Record<number, number>>({})
-  const [savingRoundKey, setSavingRoundKey] = useState<string | null>(null)
+  const [placementDraft, setPlacementDraft] = useState('')
+  const [savingPlacement, setSavingPlacement] = useState(false)
   const current = useMemo(
     () => attendance.find((row) => row.userId === userId && row.eventId === eventId) ?? null,
     [attendance, eventId, userId]
@@ -112,9 +85,12 @@ export function AdminPlayerAttendance() {
   const attended = !!current?.attended
   const placeNum =
     current?.placement == null || Number(current.placement) < 1 ? null : Number(current.placement)
-  const placeLabel = placeNum == null ? '—' : ordinalPlacement(placeNum)
-  const canPlaceUp = canPlacementUp(placeNum)
-  const canPlaceDown = canPlacementDown(placeNum)
+  const boardRow = useMemo(
+    () => placementBoard.find((row) => row.userId === userId) ?? null,
+    [placementBoard, userId]
+  )
+  const eventDeckId = boardRow?.deckId ?? null
+  const suggestedDeckId = boardRow?.suggestedDeckId ?? null
   const duplicatePlacements = useMemo(() => {
     const counts = new Map<number, number>()
     for (const row of placementBoard) {
@@ -131,38 +107,26 @@ export function AdminPlayerAttendance() {
   const hasDuplicatePlacements = duplicatePlacements.size > 0
 
   useEffect(() => {
-    const t = setTimeout(() => setDebouncedRoundQuery(roundQuery), 200)
-    return () => clearTimeout(t)
-  }, [roundQuery])
+    setPlacementDraft(placeNum == null ? '' : String(placeNum))
+  }, [placeNum])
 
-  const attendedUserIds = useMemo(() => {
-    const s = new Set<number>()
-    for (const r of placementBoard) {
-      if (r.attended) s.add(r.userId)
+  const badgeRows = useMemo(() => {
+    const rows: ManualBadgeId[][] = []
+    for (let i = 0; i < BADGES_TO_AWARD.length; i += 2) {
+      rows.push(BADGES_TO_AWARD.slice(i, i + 2))
     }
-    return s
-  }, [placementBoard])
-
-  const nameByUserId = useMemo(() => {
-    const m = new Map<number, string>()
-    for (const r of placementBoard) {
-      m.set(r.userId, r.userName || r.userEmail || `Player #${r.userId}`)
-    }
-    return m
-  }, [placementBoard])
+    return rows
+  }, [])
 
   const load = useCallback(async () => {
     if (!eventId || !userId) return
-    const [attendanceRes, detailsRes, boardRes, settingsRes, matchesRes] = await Promise.all([
+    const [attendanceRes, detailsRes, boardRes, settingsRes] = await Promise.all([
       apiRequest<{ attendance: Attendance[] }>('/admin/attendance'),
       apiRequest<{ badges?: EarnedBadge[] }>(`/admin/users/${userId}/details`),
       apiRequest<{ placements: PlacementBoardRow[] }>(`/admin/events/${eventId}/placement-board`),
       apiRequest<{ event: { scheduledRounds?: number | null; useMatchTracking?: boolean } }>(
         `/admin/events/${eventId}/settings`
       ).catch(() => ({ event: {} as { scheduledRounds?: number | null; useMatchTracking?: boolean } })),
-      apiRequest<{ matches: EventMatch[] }>(`/admin/events/${eventId}/matches`).catch(() => ({
-        matches: [],
-      })),
     ])
     setAttendance(attendanceRes.attendance)
     setEarnedBadges(Array.isArray(detailsRes.badges) ? detailsRes.badges : [])
@@ -172,7 +136,6 @@ export function AdminPlayerAttendance() {
       sr != null && Number.isFinite(Number(sr)) ? Math.min(99, Math.max(0, Math.floor(Number(sr)))) : 0
     )
     setUseMatchTracking(!!settingsRes.event?.useMatchTracking)
-    setEventMatches(Array.isArray(matchesRes.matches) ? matchesRes.matches : [])
   }, [eventId, userId])
 
   useFocusEffect(
@@ -190,25 +153,31 @@ export function AdminPlayerAttendance() {
     await load()
   }
 
-  async function bumpPlacement(delta: -1 | 1) {
+  async function setEventDeck(deckId: string) {
     if (!eventId || !userId) return
-    const cur = placeNum
-    const next = delta === -1 ? nextPlacementDown(cur) : nextPlacementUp(cur)
-    if (delta === -1 && cur != null && next === null) {
-      // Below current rank is all taken — clear placement
-      try {
-        await apiRequest('/admin/attendance-placement', {
-          method: 'POST',
-          body: JSON.stringify({ userId, eventId, placement: null }),
-        })
-        await load()
-      } catch (err: any) {
-        Alert.alert('Placement failed', err?.message || 'Try again')
-      }
+    try {
+      await apiRequest('/admin/attendance-deck', {
+        method: 'POST',
+        body: JSON.stringify({ userId, eventId, deckId }),
+      })
+      await load()
+    } catch (err: any) {
+      Alert.alert('Deck update failed', err?.message || 'Try again')
+    }
+  }
+
+  async function commitPlacement() {
+    if (!eventId || !userId || savingPlacement) return
+    const raw = placementDraft.trim()
+    const next = raw === '' ? null : Math.floor(Number(raw))
+    if (raw !== '' && (!Number.isFinite(next) || next < 1)) {
+      Alert.alert('Invalid place', 'Enter a whole number (1 or higher), or leave empty to clear.')
+      setPlacementDraft(placeNum == null ? '' : String(placeNum))
       return
     }
-    if (next == null && delta === 1) return
+    if (next === placeNum) return
     try {
+      setSavingPlacement(true)
       await apiRequest('/admin/attendance-placement', {
         method: 'POST',
         body: JSON.stringify({ userId, eventId, placement: next }),
@@ -216,55 +185,9 @@ export function AdminPlayerAttendance() {
       await load()
     } catch (err: any) {
       Alert.alert('Placement failed', err?.message || 'Try again')
-    }
-  }
-
-  async function saveRoundResult(roundNum: number, opponentId: number, result: 'win' | 'loss' | 'draw') {
-    if (!eventId || !userId) return
-    const key = `${roundNum}-${result}`
-    const prev = eventMatches
-    const optimistic = optimisticMatchFromResult(roundNum, userId, opponentId, result, nameByUserId)
-    setEventMatches((cur) => replaceFocalRoundMatches(cur, userId, roundNum, optimistic))
-    try {
-      setSavingRoundKey(key)
-      await apiRequest(`/admin/events/${eventId}/matches`, {
-        method: 'POST',
-        body: JSON.stringify({
-          roundNumber: roundNum,
-          focalUserId: userId,
-          opponentUserId: opponentId,
-          result,
-        }),
-      })
-    } catch (err: any) {
-      setEventMatches(prev)
-      Alert.alert('Match save failed', err?.message || 'Try again')
+      setPlacementDraft(placeNum == null ? '' : String(placeNum))
     } finally {
-      setSavingRoundKey(null)
-    }
-  }
-
-  async function clearRoundMatch(roundNum: number) {
-    if (!eventId || !userId) return
-    const m = matchForFocalRound(eventMatches, userId, roundNum)
-    if (!m) return
-    const prevMatches = eventMatches
-    const prevPicked = pickedOpponentId
-    setEventMatches((cur) => removeFocalRoundMatch(cur, userId, roundNum))
-    setPickedOpponentId((p) => {
-      const next = { ...p }
-      delete next[roundNum]
-      return next
-    })
-    try {
-      await apiRequest(`/admin/events/${eventId}/matches`, {
-        method: 'DELETE',
-        body: JSON.stringify({ focalUserId: userId, roundNumber: roundNum }),
-      })
-    } catch (err: any) {
-      setEventMatches(prevMatches)
-      setPickedOpponentId(prevPicked)
-      Alert.alert('Clear failed', err?.message || 'Try again')
+      setSavingPlacement(false)
     }
   }
 
@@ -308,198 +231,75 @@ export function AdminPlayerAttendance() {
                 <Text style={styles.playerAvatarInitial}>{(user?.name || '?').charAt(0).toUpperCase()}</Text>
               </View>
             )}
-            <Text style={styles.playerName}>{user?.name}</Text>
+            <View style={styles.playerHeaderText}>
+              <Text style={styles.playerName} numberOfLines={1}>
+                {user?.name}
+              </Text>
+              <Text style={styles.playerMeta} numberOfLines={1}>
+                {event?.title} · {formatEventDateLabel(event?.eventDate ?? null)}
+              </Text>
+            </View>
           </View>
-          <Text style={styles.playerMeta}>Email: {user?.email}</Text>
-          <Text style={styles.playerMeta}>Event: {event?.title}</Text>
-          <Text style={styles.playerMeta}>
-            {formatEventDateLabel(event?.eventDate ?? null)}
-            {event?.location?.trim() ? ` · ${event.location.trim()}` : ''}
-          </Text>
+        </ThemedCard>
+
+        <ThemedButton
+          label={attended ? 'Attended' : 'Mark attended'}
+          variant={attended ? 'primary' : 'outline'}
+          onPress={() => setAttendanceValue(!attended)}
+        />
+
+        <ThemedCard style={styles.deckCard}>
+          <DeckPicker
+            value={eventDeckId}
+            suggestedDeckId={suggestedDeckId}
+            onChange={setEventDeck}
+            label="Deck for this event"
+            placeholder="Select deck"
+          />
         </ThemedCard>
 
         {useMatchTracking && scheduledRounds > 0 ? (
-          <ThemedCard style={styles.roundsCard}>
-            <Text style={styles.controlLabel}>Round results</Text>
-            <Text style={styles.roundsHint}>
-              Choose an attended opponent, then W / L / D for this player. Set round count on the event
-              attendance screen.
-            </Text>
-            <Pressable
-              onPress={() => navigation.navigate('AdminRoundBoard', { event, focusUserId: userId })}
-              style={({ pressed }) => [styles.boardLink, pressed && styles.boardLinkPressed]}
-            >
-              <Text style={styles.boardLinkText}>Open round board</Text>
-              <Ionicons name="chevron-forward" size={18} color={theme.tintColor} />
-            </Pressable>
-            {Array.from({ length: scheduledRounds }, (_, idx) => idx + 1).map((roundNum) => {
-              const m = matchForFocalRound(eventMatches, userId, roundNum)
-              const effectiveOpp =
-                m != null ? opponentIdFromMatch(m, userId) : pickedOpponentId[roundNum] ?? null
-              const q = (debouncedRoundQuery[roundNum] || '').trim().toLowerCase()
-              const filtered = placementBoard.filter(
-                (r) =>
-                  r.userId !== userId &&
-                  r.attended &&
-                  (!q ||
-                    r.userName.toLowerCase().includes(q) ||
-                    r.userEmail.toLowerCase().includes(q))
-              )
-              const candidates = filtered.slice(0, 6)
-              const soleCandidate = filtered.length === 1 ? filtered[0] : null
-              const curOutcome = m ? focalOutcome(m, userId) : null
-              const busyPrefix = `${roundNum}-`
-              const busy = savingRoundKey != null && savingRoundKey.startsWith(busyPrefix)
-              const suggestion = suggestOpponentFromPreviousRound(
-                eventMatches,
-                userId,
-                roundNum,
-                attendedUserIds
-              )
-              return (
-                <View key={roundNum} style={styles.roundBlock}>
-                  <View style={styles.roundTitleRow}>
-                    <Text style={styles.roundTitle}>Round {roundNum}</Text>
-                    {m != null ? (
-                      <Pressable
-                        onPress={() => clearRoundMatch(roundNum)}
-                        hitSlop={8}
-                        style={({ pressed }) => [styles.roundClear, pressed && styles.roundClearPressed]}
-                      >
-                        <Text style={styles.roundClearLbl}>Clear</Text>
-                      </Pressable>
-                    ) : null}
-                  </View>
-                  {suggestion ? (
-                    <Text style={styles.roundSuggest} numberOfLines={2}>
-                      Previous round vs {suggestion.name}
-                    </Text>
-                  ) : null}
-                  {m != null ? (
-                    <Text style={styles.roundSavedOpp} numberOfLines={1}>
-                      vs {opponentNameFromMatch(m, userId) || `Player #${effectiveOpp}`}
-                    </Text>
-                  ) : null}
-                  <TextInput
-                    value={roundQuery[roundNum] ?? ''}
-                    onChangeText={(t) => setRoundQuery((prev) => ({ ...prev, [roundNum]: t }))}
-                    placeholder="Search opponent (attended)"
-                    placeholderTextColor={theme.mutedForegroundColor}
-                    style={styles.roundSearch}
-                  />
-                  {soleCandidate && !m ? (
-                    <Pressable
-                      onPress={() =>
-                        setPickedOpponentId((prev) => ({ ...prev, [roundNum]: soleCandidate.userId }))
-                      }
-                      style={({ pressed }) => [styles.topMatchChip, pressed && styles.topMatchChipPressed]}
-                    >
-                      <Text style={styles.topMatchChipText}>Use top match · {soleCandidate.userName}</Text>
-                    </Pressable>
-                  ) : null}
-                  <ScrollView
-                    style={styles.roundPickList}
-                    nestedScrollEnabled
-                    keyboardShouldPersistTaps="handled"
-                  >
-                    {candidates.map((r) => (
-                      <Pressable
-                        key={r.userId}
-                        onPress={() =>
-                          setPickedOpponentId((prev) => ({ ...prev, [roundNum]: r.userId }))
-                        }
-                        style={({ pressed }) => [
-                          styles.roundPickRow,
-                          effectiveOpp === r.userId && styles.roundPickRowActive,
-                          pressed && styles.roundPickRowPressed,
-                        ]}
-                      >
-                        <Text style={styles.roundPickName} numberOfLines={1}>
-                          {r.userName}
-                        </Text>
-                        <Text style={styles.roundPickEmail} numberOfLines={1}>
-                          {r.userEmail}
-                        </Text>
-                      </Pressable>
-                    ))}
-                  </ScrollView>
-                  {effectiveOpp != null ? (
-                    <View style={styles.wldRow}>
-                      {(['win', 'loss', 'draw'] as const).map((res) => (
-                        <Pressable
-                          key={res}
-                          disabled={busy}
-                          onPress={() => saveRoundResult(roundNum, effectiveOpp, res)}
-                          style={({ pressed }) => [
-                            styles.wldBtn,
-                            curOutcome === res && styles.wldBtnActive,
-                            pressed && !busy && styles.wldBtnPressed,
-                            busy && styles.wldBtnDimmed,
-                          ]}
-                        >
-                          <Text
-                            style={[
-                              styles.wldBtnLabel,
-                              curOutcome === res && styles.wldBtnLabelActive,
-                            ]}
-                          >
-                            {res === 'win' ? 'W' : res === 'loss' ? 'L' : 'D'}
-                          </Text>
-                        </Pressable>
-                      ))}
-                    </View>
-                  ) : (
-                    <Text style={styles.roundNeedOpp}>Select an opponent to record a result.</Text>
-                  )}
-                </View>
-              )
-            })}
-          </ThemedCard>
+          <Pressable
+            onPress={() => navigation.navigate('AdminRoundBoard', { event, focusUserId: userId })}
+            style={({ pressed }) => [styles.boardLink, pressed && styles.boardLinkPressed]}
+          >
+            <Text style={styles.boardLinkText}>Round board</Text>
+            <AppIcon name="chevron-right" size={18} color={theme.tintColor} />
+          </Pressable>
         ) : null}
 
-        <ThemedCard style={[styles.controlsCard, styles.placementRosterCard]}>
-          <Pressable
-            onPress={() => setPlacementBoardOpen((o) => !o)}
-            style={({ pressed }) => [
-              styles.placementBoardHeader,
-              pressed && styles.placementBoardHeaderPressed,
-            ]}
-          >
-            <View style={styles.placementBoardHeaderText}>
-              <Text style={styles.placementBoardTitle}>Event placement roster</Text>
-              <Text style={styles.placementBoardHint}>
-                {hasDuplicatePlacements
-                  ? 'Duplicate ranks — fix before saving more'
-                  : "See every player's rank for this event"}
-              </Text>
+        <ThemedCard style={styles.leaderboardCard}>
+          <Text style={styles.controlLabel}>Leaderboard</Text>
+          <View style={styles.placementEntryRow}>
+            <Text style={styles.placementEntryLabel}>Place</Text>
+            <Input
+              value={placementDraft}
+              onChangeText={setPlacementDraft}
+              onBlur={() => commitPlacement()}
+              onSubmitEditing={() => commitPlacement()}
+              keyboardType="number-pad"
+              placeholder="#"
+              returnKeyType="done"
+              editable={!savingPlacement}
+              className="mb-0 min-h-11 flex-1"
+            />
+          </View>
+          {hasDuplicatePlacements ? (
+            <Text style={styles.placementWarn}>Duplicate places — adjust ranks</Text>
+          ) : null}
+          <View style={styles.placementTable}>
+            <View style={styles.placementTableHead}>
+              <Text style={[styles.placementTh, styles.placementThPlayer]}>Player</Text>
+              <Text style={styles.placementTh}>#</Text>
             </View>
-            <View style={styles.placementBoardHeaderRight}>
-              {hasDuplicatePlacements ? (
-                <View style={styles.dupBadge}>
-                  <Text style={styles.dupBadgeText}>!</Text>
-                </View>
-              ) : null}
-              <Ionicons
-                name={placementBoardOpen ? 'chevron-up' : 'chevron-down'}
-                size={22}
-                color={theme.textColor}
-              />
-            </View>
-          </Pressable>
-          {placementBoardOpen ? (
-            <View style={styles.placementTable}>
-              <View style={styles.placementTableHead}>
-                <Text style={[styles.placementTh, styles.placementThPlayer]}>Player</Text>
-                <Text style={styles.placementTh}>Place</Text>
-              </View>
-              <ScrollView
-                style={styles.placementTableScroll}
-                nestedScrollEnabled
-                keyboardShouldPersistTaps="handled"
-              >
-                {placementBoard.map((row) => {
+            <ScrollView
+              style={styles.placementTableScroll}
+              nestedScrollEnabled
+              keyboardShouldPersistTaps="handled"
+            >
+              {placementBoard.map((row) => {
                 const p = row.placement == null || row.placement < 1 ? null : Number(row.placement)
-                const placeCell = p == null ? '—' : ordinalPlacement(p)
+                const placeCell = p == null ? '—' : String(p)
                 const isDup = p != null && duplicatePlacements.has(p)
                 const isCurrent = row.userId === userId
                 return (
@@ -511,101 +311,53 @@ export function AdminPlayerAttendance() {
                       isCurrent && styles.placementRowCurrent,
                     ]}
                   >
-                    <View style={styles.placementCellPlayer}>
-                      <Text style={styles.placementName} numberOfLines={1}>
-                        {row.userName}
-                      </Text>
-                      <Text style={styles.placementEmail} numberOfLines={1}>
-                        {row.userEmail}
-                      </Text>
-                    </View>
+                    <Text style={styles.placementName} numberOfLines={1}>
+                      {row.userName}
+                    </Text>
                     <Text style={[styles.placementPlace, isDup && styles.placementPlaceDup]}>
                       {placeCell}
                     </Text>
                   </View>
                 )
               })}
-              </ScrollView>
-            </View>
-          ) : null}
+            </ScrollView>
+          </View>
         </ThemedCard>
 
-        <ThemedCard style={styles.controlsCard}>
-          <Text style={styles.controlLabel}>Placement</Text>
-          <View style={styles.placementStepper}>
-            <Pressable
-              onPress={() => bumpPlacement(-1)}
-              disabled={!canPlaceDown}
-              style={({ pressed }) => [
-                styles.placementStepperBtn,
-                !canPlaceDown && styles.placementStepperBtnDimmed,
-                pressed && canPlaceDown && styles.placementStepperBtnPressed,
-              ]}
-            >
-              <Ionicons
-                name="remove-outline"
-                size={22}
-                color={!canPlaceDown ? theme.mutedForegroundColor : theme.textColor}
-              />
-            </Pressable>
-            <Text style={styles.placementStepperLabel}>{placeLabel}</Text>
-            <Pressable
-              onPress={() => bumpPlacement(1)}
-              disabled={!canPlaceUp}
-              style={({ pressed }) => [
-                styles.placementStepperBtn,
-                !canPlaceUp && styles.placementStepperBtnDimmed,
-                pressed && canPlaceUp && styles.placementStepperBtnPressed,
-              ]}
-            >
-              <Ionicons
-                name="add-outline"
-                size={22}
-                color={!canPlaceUp ? theme.mutedForegroundColor : theme.textColor}
-              />
-            </Pressable>
-          </View>
-        </ThemedCard>
         <ThemedCard style={styles.badgesCard}>
-          <Text style={styles.controlLabel}>Give badges</Text>
-          <View style={styles.badgeGrid}>
-            {BADGES_TO_AWARD.map((badge) => {
-              const alreadyAwarded = earnedBadges.some((b) => b.badgeId === badge.id)
-              const title = BADGE_DISPLAY_TITLE[badge.id]
-              const description = BADGE_AWARD_TEXT[badge.id]
-              return (
-                <Pressable
-                  key={badge.id}
-                  onPress={() => toggleManualBadge(badge.id)}
-                  style={({ pressed }) => [
-                    styles.badgeOption,
-                    alreadyAwarded && styles.badgeOptionAwarded,
-                    pressed && styles.badgeOptionPressed,
-                  ]}
-                >
-                  <View style={styles.badgeImageWrap}>
-                    <Image source={badge.icon} style={styles.badgeOptionImage} resizeMode="contain" />
-                  </View>
-                  <Text style={styles.badgeOptionTitle} numberOfLines={1}>
-                    {title}
-                  </Text>
-                  <Text style={styles.badgeOptionDesc} numberOfLines={2}>
-                    {description}
-                  </Text>
-                  {alreadyAwarded ? (
-                    <Text style={styles.badgeAwardedLabel}>Awarded</Text>
-                  ) : null}
-                </Pressable>
-              )
-            })}
-          </View>
+          <Text style={styles.controlLabel}>Badges</Text>
+          {badgeRows.map((row, rowIndex) => (
+            <View key={rowIndex} style={styles.badgeRow}>
+              {row.map((badgeId) => {
+                const alreadyAwarded = earnedBadges.some((b) => b.badgeId === badgeId)
+                const title = BADGE_DISPLAY_TITLE[badgeId]
+                return (
+                  <Pressable
+                    key={badgeId}
+                    onPress={() => toggleManualBadge(badgeId)}
+                    style={({ pressed }) => [
+                      styles.badgeOption,
+                      alreadyAwarded && styles.badgeOptionAwarded,
+                      pressed && styles.badgeOptionPressed,
+                    ]}
+                  >
+                    <View style={styles.badgeImageWrap}>
+                      <BadgeVectorIcon
+                        badgeId={badgeId}
+                        size={40}
+                        color={alreadyAwarded ? theme.tintColor : theme.textColor}
+                        opacity={alreadyAwarded ? 1 : 0.55}
+                      />
+                    </View>
+                    <Text style={styles.badgeOptionTitle} numberOfLines={1}>
+                      {title}
+                    </Text>
+                  </Pressable>
+                )
+              })}
+            </View>
+          ))}
         </ThemedCard>
-        <ThemedButton
-          label={attended ? 'Attended' : 'Mark attended'}
-          variant={attended ? 'primary' : 'outline'}
-          onPress={() => setAttendanceValue(!attended)}
-          style={styles.attendedButton}
-        />
       </View>
     </ScrollView>
   )
@@ -628,6 +380,7 @@ const getStyles = (theme: any) =>
       backgroundColor: theme.backgroundColor,
       paddingHorizontal: SPACING.containerPadding,
       paddingTop: SPACING.xl,
+      gap: SPACING.md,
     },
     playerCard: { marginBottom: SPACING.md },
     playerHeaderRow: {
@@ -636,20 +389,22 @@ const getStyles = (theme: any) =>
       gap: SPACING.md,
       marginBottom: SPACING.xs,
     },
+    playerHeaderText: {
+      flex: 1,
+      minWidth: 0,
+    },
     playerAvatar: {
-      width: 56,
-      height: 56,
-      borderRadius: 28,
-      marginBottom: SPACING.sm,
+      width: 48,
+      height: 48,
+      borderRadius: 24,
       borderWidth: 1,
       borderColor: theme.borderColor,
       backgroundColor: theme.cardBackground,
     },
     playerAvatarFallback: {
-      width: 56,
-      height: 56,
-      borderRadius: 28,
-      marginBottom: SPACING.sm,
+      width: 48,
+      height: 48,
+      borderRadius: 24,
       borderWidth: 1,
       borderColor: theme.borderColor,
       alignItems: 'center',
@@ -673,204 +428,64 @@ const getStyles = (theme: any) =>
       fontSize: TYPOGRAPHY.bodySmall,
       marginTop: 2,
     },
-    roundsCard: {
-      marginBottom: SPACING.md,
-      gap: SPACING.sm,
-    },
-    roundsHint: {
-      color: theme.mutedForegroundColor,
-      fontFamily: theme.regularFont,
-      fontSize: TYPOGRAPHY.caption,
-      lineHeight: TYPOGRAPHY.caption * 1.4,
-      marginBottom: SPACING.xs,
-    },
-    roundBlock: {
-      marginTop: SPACING.sm,
-      paddingTop: SPACING.sm,
-      borderTopWidth: StyleSheet.hairlineWidth * 2,
-      borderTopColor: theme.borderColor,
-    },
-    roundTitle: {
-      color: theme.textColor,
-      fontFamily: theme.semiBoldFont,
-      fontSize: TYPOGRAPHY.bodySmall,
-    },
-    roundTitleRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      marginBottom: SPACING.xs,
-    },
-    roundClear: { paddingVertical: 4, paddingHorizontal: 4 },
-    roundClearPressed: { opacity: 0.8 },
-    roundClearLbl: {
-      fontFamily: theme.mediumFont,
-      fontSize: TYPOGRAPHY.caption,
-      color: theme.tintColor,
-    },
-    roundSuggest: {
-      color: theme.mutedForegroundColor,
-      fontFamily: theme.regularFont,
-      fontSize: TYPOGRAPHY.caption,
-      fontStyle: 'italic',
-      marginBottom: SPACING.xs,
-    },
     boardLink: {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
-      paddingVertical: SPACING.sm,
+      paddingVertical: SPACING.md,
       paddingHorizontal: SPACING.md,
-      borderRadius: RADIUS.md,
-      borderWidth: 1,
-      borderColor: theme.tintColor,
-      backgroundColor: theme.cardBackground,
-      marginBottom: SPACING.sm,
+      borderRadius: RADIUS.lg,
+      borderWidth: 1.5,
+      borderColor: theme.borderColor,
+      backgroundColor: theme.cardBackground ?? theme.backgroundColor,
+      marginBottom: SPACING.md,
+      minHeight: 48,
     },
     boardLinkPressed: { opacity: 0.9 },
-    boardLinkText: { fontFamily: theme.semiBoldFont, fontSize: TYPOGRAPHY.bodySmall, color: theme.tintColor },
-    topMatchChip: {
-      alignSelf: 'flex-start',
-      marginBottom: SPACING.xs,
-      paddingVertical: SPACING.xs,
-      paddingHorizontal: SPACING.sm,
-      borderRadius: RADIUS.md,
-      backgroundColor: theme.surfaceMuted ?? theme.buttonBackground,
-      borderWidth: 1,
-      borderColor: theme.borderColor,
-    },
-    topMatchChipPressed: { opacity: 0.9 },
-    topMatchChipText: { fontFamily: theme.mediumFont, fontSize: TYPOGRAPHY.caption, color: theme.tintColor },
-    roundSavedOpp: {
-      color: theme.mutedForegroundColor,
-      fontFamily: theme.regularFont,
-      fontSize: TYPOGRAPHY.caption,
-      marginBottom: SPACING.xs,
-    },
-    roundSearch: {
-      borderWidth: 1,
-      borderColor: theme.borderColor,
-      borderRadius: RADIUS.md,
-      paddingHorizontal: SPACING.md,
-      paddingVertical: SPACING.sm,
-      color: theme.textColor,
-      fontFamily: theme.regularFont,
-      fontSize: TYPOGRAPHY.bodySmall,
-      marginBottom: SPACING.xs,
-    },
-    roundPickList: {
-      maxHeight: 140,
-      marginBottom: SPACING.sm,
-    },
-    roundPickRow: {
-      paddingVertical: SPACING.sm,
-      paddingHorizontal: SPACING.sm,
-      borderRadius: RADIUS.md,
-      borderWidth: 1,
-      borderColor: theme.borderColor,
-      marginBottom: SPACING.xs,
-      backgroundColor: theme.cardBackground,
-    },
-    roundPickRowActive: {
-      borderColor: theme.tintColor,
-      backgroundColor: theme.surfaceMuted ?? theme.buttonBackground,
-    },
-    roundPickRowPressed: { opacity: 0.85 },
-    roundPickName: {
-      color: theme.textColor,
-      fontFamily: theme.mediumFont,
-      fontSize: TYPOGRAPHY.bodySmall,
-    },
-    roundPickEmail: {
-      color: theme.mutedForegroundColor,
-      fontFamily: theme.regularFont,
-      fontSize: TYPOGRAPHY.caption,
-      marginTop: 2,
-    },
-    roundNeedOpp: {
-      color: theme.mutedForegroundColor,
-      fontFamily: theme.regularFont,
-      fontSize: TYPOGRAPHY.caption,
-      fontStyle: 'italic',
-    },
-    wldRow: {
-      flexDirection: 'row',
-      gap: SPACING.sm,
-      alignItems: 'center',
-    },
-    wldBtn: {
-      flex: 1,
-      paddingVertical: SPACING.md,
-      borderRadius: RADIUS.md,
-      borderWidth: 1,
-      borderColor: theme.borderColor,
-      alignItems: 'center',
-      backgroundColor: theme.cardBackground,
-    },
-    wldBtnActive: {
-      borderColor: theme.tintColor,
-      backgroundColor: theme.tintColor,
-    },
-    wldBtnPressed: { opacity: 0.88 },
-    wldBtnDimmed: { opacity: 0.5 },
-    wldBtnLabel: {
-      fontFamily: theme.boldFont,
-      fontSize: TYPOGRAPHY.body,
-      color: theme.textColor,
-    },
-    wldBtnLabelActive: {
-      color: theme.tintTextColor ?? theme.backgroundColor,
-    },
-    controlsCard: { gap: SPACING.sm },
-    placementRosterCard: { marginBottom: SPACING.sm },
-    placementBoardHeader: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      paddingVertical: SPACING.xs,
-    },
-    placementBoardHeaderPressed: { opacity: 0.85 },
-    placementBoardHeaderText: { flex: 1, paddingRight: SPACING.md },
-    placementBoardHeaderRight: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm },
-    placementBoardTitle: {
-      color: theme.textColor,
+    boardLinkText: {
       fontFamily: theme.semiBoldFont,
       fontSize: TYPOGRAPHY.bodySmall,
+      color: theme.textColor,
     },
-    placementBoardHint: {
-      color: theme.mutedForegroundColor,
-      fontFamily: theme.regularFont,
-      fontSize: TYPOGRAPHY.caption,
-      marginTop: 4,
+    deckCard: {
+      marginTop: SPACING.md,
+      marginBottom: SPACING.md,
     },
-    dupBadge: {
-      minWidth: 22,
-      height: 22,
-      borderRadius: 11,
-      backgroundColor: '#F97316',
+    leaderboardCard: {
+      marginBottom: SPACING.md,
+      gap: SPACING.sm,
+    },
+    placementEntryRow: {
+      flexDirection: 'row',
       alignItems: 'center',
-      justifyContent: 'center',
-      paddingHorizontal: 6,
+      gap: SPACING.sm,
     },
-    dupBadgeText: {
-      color: '#fff',
-      fontFamily: theme.boldFont,
-      fontSize: 12,
+    placementEntryLabel: {
+      color: theme.mutedForegroundColor,
+      fontFamily: theme.mediumFont,
+      fontSize: TYPOGRAPHY.bodySmall,
+      width: 44,
+    },
+    placementWarn: {
+      color: '#F97316',
+      fontFamily: theme.mediumFont,
+      fontSize: TYPOGRAPHY.caption,
     },
     placementTable: {
       marginTop: SPACING.sm,
-      borderWidth: 1,
+      borderWidth: 1.5,
       borderColor: theme.borderColor,
       borderRadius: RADIUS.md,
       overflow: 'hidden',
+      backgroundColor: theme.cardBackground ?? theme.backgroundColor,
     },
     placementTableScroll: {
       maxHeight: 320,
     },
     placementTableHead: {
       flexDirection: 'row',
-      backgroundColor: theme.buttonBackground,
-      borderBottomWidth: 1,
+      backgroundColor: theme.surfaceMuted ?? theme.cardBackground ?? theme.backgroundColor,
+      borderBottomWidth: 1.5,
       borderBottomColor: theme.borderColor,
       paddingVertical: SPACING.sm,
       paddingHorizontal: SPACING.md,
@@ -899,17 +514,12 @@ const getStyles = (theme: any) =>
       borderLeftWidth: 3,
       borderLeftColor: theme.tintColor,
     },
-    placementCellPlayer: { flex: 1, paddingRight: SPACING.sm },
     placementName: {
+      flex: 1,
       color: theme.textColor,
       fontFamily: theme.mediumFont,
       fontSize: TYPOGRAPHY.bodySmall,
-    },
-    placementEmail: {
-      color: theme.mutedForegroundColor,
-      fontFamily: theme.regularFont,
-      fontSize: TYPOGRAPHY.caption,
-      marginTop: 2,
+      paddingRight: SPACING.sm,
     },
     placementPlace: {
       width: 56,
@@ -927,75 +537,40 @@ const getStyles = (theme: any) =>
       fontSize: TYPOGRAPHY.bodySmall,
       marginTop: SPACING.xs,
     },
-    placementStepper: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      borderWidth: 1,
-      borderColor: theme.borderColor,
-      borderRadius: RADIUS.md,
-      backgroundColor: theme.cardBackground,
-      overflow: 'hidden',
-      alignSelf: 'flex-start',
-    },
-    placementStepperBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
-    placementStepperBtnDimmed: { opacity: 0.45 },
-    placementStepperBtnPressed: { opacity: 0.75 },
-    placementStepperLabel: {
-      minWidth: 64,
-      paddingHorizontal: SPACING.xs,
-      textAlign: 'center',
-      fontFamily: theme.boldFont,
-      fontSize: TYPOGRAPHY.bodySmall,
-      color: theme.textColor,
-      borderLeftWidth: 1,
-      borderRightWidth: 1,
-      borderColor: theme.borderColor,
-      lineHeight: 44,
-    },
-    attendedButton: {
-      marginTop: SPACING.md,
-    },
     badgesCard: {
       marginTop: SPACING.md,
       gap: SPACING.sm,
     },
-    badgeGrid: {
+    badgeRow: {
       flexDirection: 'row',
-      flexWrap: 'wrap',
-      gap: SPACING.md,
-      justifyContent: 'space-between',
+      gap: SPACING.sm,
     },
     badgeOption: {
-      width: '48%',
-      borderWidth: 1,
+      flex: 1,
+      minWidth: 0,
+      borderWidth: 1.5,
       borderColor: theme.borderColor,
       borderRadius: RADIUS.lg,
-      backgroundColor: theme.cardBackground,
-      minHeight: 168,
-      paddingHorizontal: SPACING.sm,
-      paddingTop: SPACING.md,
-      paddingBottom: SPACING.md,
+      backgroundColor: theme.cardBackground ?? theme.backgroundColor,
+      minHeight: 96,
+      paddingHorizontal: SPACING.xs,
+      paddingVertical: SPACING.sm,
       alignItems: 'center',
+      justifyContent: 'center',
     },
     badgeOptionAwarded: {
       borderColor: theme.tintColor,
-      backgroundColor: theme.surfaceMuted ?? theme.cardBackground,
+      backgroundColor: `${theme.tintColor}18`,
     },
     badgeOptionPressed: {
       opacity: 0.85,
     },
     badgeImageWrap: {
-      width: 72,
-      height: 72,
+      width: 44,
+      height: 44,
       alignItems: 'center',
       justifyContent: 'center',
-      overflow: 'hidden',
       marginBottom: SPACING.xs,
-    },
-    badgeOptionImage: {
-      width: 56,
-      height: 56,
-      transform: [{ scale: 1.85 }, { translateY: 6 }],
     },
     badgeOptionTitle: {
       color: theme.textColor,
@@ -1003,23 +578,6 @@ const getStyles = (theme: any) =>
       fontSize: TYPOGRAPHY.bodySmall,
       textAlign: 'center',
       width: '100%',
-    },
-    badgeOptionDesc: {
-      marginTop: 2,
-      color: theme.mutedForegroundColor,
-      fontFamily: theme.regularFont,
-      fontSize: TYPOGRAPHY.caption,
-      lineHeight: Math.round(TYPOGRAPHY.caption * 1.35),
-      textAlign: 'center',
-      width: '100%',
-      paddingHorizontal: 2,
-    },
-    badgeAwardedLabel: {
-      marginTop: SPACING.xs,
-      color: theme.tintColor,
-      fontFamily: theme.mediumFont,
-      fontSize: TYPOGRAPHY.caption,
-      textAlign: 'center',
     },
     emptyWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.backgroundColor },
     emptyText: { color: theme.mutedForegroundColor, fontFamily: theme.mediumFont, fontSize: TYPOGRAPHY.body },

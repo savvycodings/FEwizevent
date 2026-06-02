@@ -11,7 +11,6 @@ import {
   View,
 } from 'react-native'
 import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native'
-import Ionicons from '@expo/vector-icons/Ionicons'
 import {
   BottomSheetBackdrop,
   BottomSheetFlatList,
@@ -297,7 +296,7 @@ export function AdminRoundBoard() {
       </Text>
       <ThemedButton
         label="Open event attendance"
-        onPress={() => navigation.navigate('AdminEventAttendance', { event })}
+        onPress={() => navigation.navigate('AdminEventManage', { event })}
         style={styles.emptyBtn}
       />
     </ThemedCard>
@@ -504,13 +503,15 @@ const getStyles = (theme: any) =>
     },
     tabScroll: { flexGrow: 0 },
     tabPill: {
-      paddingHorizontal: SPACING.md,
-      paddingVertical: SPACING.sm,
-      borderRadius: RADIUS.full ?? 999,
-      borderWidth: 1,
+      paddingHorizontal: SPACING.lg,
+      paddingVertical: SPACING.md,
+      borderRadius: RADIUS.lg,
+      borderWidth: StyleSheet.hairlineWidth * 2,
       borderColor: theme.borderColor,
       marginRight: SPACING.sm,
-      backgroundColor: theme.cardBackground,
+      backgroundColor: theme.backgroundColor,
+      minHeight: 44,
+      justifyContent: 'center',
     },
     tabPillActive: {
       borderColor: theme.tintColor,
@@ -573,14 +574,14 @@ const getStyles = (theme: any) =>
     },
     wldWrap: { flexDirection: 'row', gap: 4, marginRight: SPACING.xs },
     wldMini: {
-      minWidth: 32,
-      paddingVertical: 6,
-      paddingHorizontal: 6,
-      borderRadius: RADIUS.sm,
-      borderWidth: 1,
+      minWidth: 40,
+      paddingVertical: SPACING.sm,
+      paddingHorizontal: SPACING.sm,
+      borderRadius: RADIUS.md,
+      borderWidth: StyleSheet.hairlineWidth * 2,
       borderColor: theme.borderColor,
       alignItems: 'center',
-      backgroundColor: theme.cardBackground,
+      backgroundColor: theme.backgroundColor,
     },
     wldMiniOn: {
       borderColor: theme.tintColor,
@@ -623,7 +624,7 @@ const getStyles = (theme: any) =>
       paddingVertical: SPACING.xs,
       paddingHorizontal: SPACING.sm,
       borderRadius: RADIUS.md,
-      backgroundColor: theme.surfaceMuted ?? theme.buttonBackground,
+      backgroundColor: theme.backgroundColor,
       borderWidth: 1,
       borderColor: theme.borderColor,
     },

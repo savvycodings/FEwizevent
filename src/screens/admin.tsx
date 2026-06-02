@@ -6,25 +6,43 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from 'react-native'
 import { pickImageWithSource } from '../utils/pickImageWithSource'
 import { BlurView } from 'expo-blur'
-import Ionicons from '@expo/vector-icons/Ionicons'
+import { AppIcon } from '../components'
 import { useNavigation, useRoute } from '@react-navigation/native'
 import { ThemeContext } from '../context'
-import { EventDateField, ThemedButton, ThemedCard } from '../components'
+import { BRAND } from '../constants/brandColors'
+import {
+  EventDateField,
+  Input,
+  Label,
+  SearchField,
+  SegmentedTabs,
+  ThemedButton,
+  ThemedCard,
+  Text as UiText,
+} from '../components'
 import { RADIUS, SPACING, TYPOGRAPHY } from '../constants/layout'
 import { apiRequest } from '../api'
+import { DeckPicker } from '../components/content/DeckPicker'
 import { DOMAIN } from '../../constants'
 import { getAdminPassHeaders } from '../adminSession'
 import {
-  canPlacementDown,
-  canPlacementUp,
-  nextPlacementDown,
-  nextPlacementUp,
-} from '../utils/placementUtils'
+  EVENT_TIER_EXAMPLES,
+  EVENT_TIER_LABEL,
+  EVENT_TIER_SEGMENT_OPTIONS,
+  formatTierMultiplier,
+  type EventTier,
+} from '../constants/eventTiers'
+
+function formatEventTierLabel(tier: string | null | undefined): string {
+  if (tier === 'challenge' || tier === 'cup' || tier === 'casual') {
+    return `${EVENT_TIER_LABEL[tier]} (${formatTierMultiplier(tier)})`
+  }
+  return `${EVENT_TIER_LABEL.casual} (${formatTierMultiplier('casual')})`
+}
 
 type User = { id: number; name: string; email: string }
 type Event = {
@@ -33,16 +51,17 @@ type Event = {
   eventDate: string | null
   location: string | null
   bannerImageUrl?: string | null
+  eventTier?: EventTier | string | null
 }
-type Attendance = { userId: number; eventId: number; attended: boolean; placement?: number | null }
-
-function ordinalPlacement(n: number): string {
-  const j = n % 10
-  const k = n % 100
-  if (j === 1 && k !== 11) return `${n}st`
-  if (j === 2 && k !== 12) return `${n}nd`
-  if (j === 3 && k !== 13) return `${n}rd`
-  return `${n}th`
+type Attendance = {
+  userId: number
+  eventId: number
+  attended: boolean
+  placement?: number | null
+  /** Deck recorded for this event (frozen once set). */
+  deckId?: string | null
+  /** Current profile deck — suggestion only when deckId is empty. */
+  suggestedDeckId?: string | null
 }
 
 function formatEventDateLabel(eventDate: string | null): string {
@@ -72,6 +91,7 @@ export function Admin() {
   const [eventDate, setEventDate] = useState('')
   const [location, setLocation] = useState('')
   const [bannerImageUrl, setBannerImageUrl] = useState<string | null>(null)
+  const [eventTier, setEventTier] = useState<EventTier>('casual')
   const [bannerUploading, setBannerUploading] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedEventId, setSelectedEventId] = useState<number | null>(null)
@@ -96,6 +116,22 @@ export function Admin() {
     attendance.forEach((row) => {
       const k = `${row.userId}:${row.eventId}`
       map[k] = row.placement == null ? null : Number(row.placement)
+    })
+    return map
+  }, [attendance])
+
+  const deckMap = useMemo(() => {
+    const map: Record<string, string | null> = {}
+    attendance.forEach((row) => {
+      map[`${row.userId}:${row.eventId}`] = row.deckId ?? null
+    })
+    return map
+  }, [attendance])
+
+  const suggestedDeckMap = useMemo(() => {
+    const map: Record<string, string | null> = {}
+    attendance.forEach((row) => {
+      map[`${row.userId}:${row.eventId}`] = row.suggestedDeckId ?? null
     })
     return map
   }, [attendance])
@@ -134,26 +170,25 @@ export function Admin() {
     await load()
   }
 
-  async function bumpPlacement(userId: number, eventId: number, delta: -1 | 1) {
-    const key = `${userId}:${eventId}`
-    const raw = placementMap[key]
-    const cur = raw == null || raw < 1 ? null : raw
-    const next = delta === -1 ? nextPlacementDown(cur) : nextPlacementUp(cur)
+  async function setAttendanceDeck(userId: number, eventId: number, deckId: string) {
+    await apiRequest('/admin/attendance-deck', {
+      method: 'POST',
+      body: JSON.stringify({ userId, eventId, deckId }),
+    })
+    await load()
+  }
 
-    if (delta === -1 && cur != null && next === null) {
-      try {
-        await apiRequest('/admin/attendance-placement', {
-          method: 'POST',
-          body: JSON.stringify({ userId, eventId, placement: null }),
-        })
-        await load()
-      } catch (err: any) {
-        Alert.alert('Placement failed', err?.message || 'Try again')
-      }
+  async function setPlacementFromInput(userId: number, eventId: number, raw: string) {
+    const trimmed = raw.trim()
+    const next = trimmed === '' ? null : Math.floor(Number(trimmed))
+    if (trimmed !== '' && (!Number.isFinite(next) || next < 1)) {
+      Alert.alert('Invalid place', 'Enter a whole number (1 or higher), or leave empty to clear.')
       return
     }
-    if (next == null && delta === 1) return
-
+    const key = `${userId}:${eventId}`
+    const cur = placementMap[key]
+    const curNum = cur == null || cur < 1 ? null : cur
+    if (next === curNum) return
     try {
       await apiRequest('/admin/attendance-placement', {
         method: 'POST',
@@ -211,12 +246,14 @@ export function Admin() {
         eventDate: eventDate || null,
         location: location || null,
         bannerImageUrl: bannerImageUrl || null,
+        eventTier,
       }),
     })
     setTitle('')
     setEventDate('')
     setLocation('')
     setBannerImageUrl(null)
+    setEventTier('casual')
     await load()
     if (!lockedMode) {
       setTab('attendance')
@@ -229,31 +266,31 @@ export function Admin() {
       </View>
       <View style={styles.surface}>
         {!lockedMode ? (
-          <View style={styles.tabRow}>
-            <ThemedButton
-              label="Attendance"
-              variant={tab === 'attendance' ? 'primary' : 'outline'}
-              style={styles.tabButton}
-              onPress={() => setTab('attendance')}
-            />
-            <ThemedButton
-              label="Create Event"
-              variant={tab === 'create' ? 'primary' : 'outline'}
-              style={styles.tabButton}
-              onPress={() => setTab('create')}
-            />
-          </View>
+          <SegmentedTabs<'attendance' | 'create'>
+            style={styles.tabRow}
+            value={tab}
+            onChange={setTab}
+            options={[
+              { value: 'attendance', label: 'Attendance' },
+              { value: 'create', label: 'Create Event' },
+            ]}
+          />
         ) : null}
 
         {tab === 'create' ? (
           <ThemedCard>
-            <Text style={styles.sectionTitle}>Create Event</Text>
-            <TextInput
+            <UiText variant="h4" className="mb-3 text-foreground">
+              Create Event
+            </UiText>
+            <Label nativeID="event-title" className="mb-2">
+              Event title
+            </Label>
+            <Input
               value={title}
               onChangeText={setTitle}
-              style={styles.input}
               placeholder="Event title"
-              placeholderTextColor={theme.mutedForegroundColor}
+              className="mb-3"
+              aria-labelledby="event-title"
             />
             <EventDateField
               value={eventDate}
@@ -261,18 +298,37 @@ export function Admin() {
               label="Event date (optional)"
               optional
             />
-            <TextInput
+            <Label nativeID="event-location" className="mb-2">
+              Location
+            </Label>
+            <Input
               value={location}
               onChangeText={setLocation}
-              style={styles.input}
               placeholder="Location"
-              placeholderTextColor={theme.mutedForegroundColor}
+              className="mb-3"
+              aria-labelledby="event-location"
             />
 
-            <Text style={styles.fieldLabel}>Event banner (optional)</Text>
-            <Text style={styles.fieldHint}>
+            <Label nativeID="event-tier" className="mb-2">
+              Event tier
+            </Label>
+            <UiText variant="muted" className="mb-2">
+              Every event has a tier that multiplies earned XP. Set when creating the event.
+            </UiText>
+            <SegmentedTabs<EventTier>
+              style={styles.tierTabs}
+              value={eventTier}
+              onChange={setEventTier}
+              options={EVENT_TIER_SEGMENT_OPTIONS}
+            />
+            <UiText variant="muted" className="mb-1 mt-2 text-[11px]">
+              {EVENT_TIER_EXAMPLES[eventTier]} · {formatTierMultiplier(eventTier)} XP
+            </UiText>
+
+            <UiText className="mb-1 mt-3 text-sm font-medium text-foreground">Event banner (optional)</UiText>
+            <UiText variant="muted" className="mb-3">
               Wide image works best. Shown on the Events tab with a blurred background.
-            </Text>
+            </UiText>
             {bannerImageUrl ? (
               <View style={styles.bannerPreviewWrap}>
                 <Image source={{ uri: bannerImageUrl }} style={styles.bannerPreview} />
@@ -297,7 +353,7 @@ export function Admin() {
           <>
             {events.length === 0 ? (
               <ThemedCard style={styles.eventCard}>
-                <Text style={styles.emptyEventsText}>Create an event to take attendance.</Text>
+                <UiText variant="muted">Create an event to take attendance.</UiText>
               </ThemedCard>
             ) : (
               <View style={styles.attendanceBannerList}>
@@ -306,7 +362,7 @@ export function Admin() {
                     key={event.id}
                     onPress={() => {
                       if (lockedMode === 'attendance') {
-                        navigation.navigate('AdminEventAttendance', { event })
+                        navigation.navigate('AdminEventManage', { event })
                       } else {
                         setSelectedEventId(event.id)
                       }
@@ -332,22 +388,20 @@ export function Admin() {
               <ThemedCard style={styles.eventCard}>
                 <Text style={styles.selectedEventTitle}>{selectedEvent.title}</Text>
                 <Text style={styles.selectedEventMeta}>
+                  {formatEventTierLabel(selectedEvent.eventTier)}
+                  {' · '}
                   {formatEventDateLabel(selectedEvent.eventDate)}
                   {selectedEvent.location?.trim()
                     ? ` · ${selectedEvent.location.trim()}`
                     : ''}
                 </Text>
                 <Text style={styles.peopleSectionLabel}>People</Text>
-                <View style={styles.searchWrap}>
-                  <Ionicons name="search-outline" size={18} color={theme.mutedForegroundColor} />
-                  <TextInput
-                    value={searchQuery}
-                    onChangeText={setSearchQuery}
-                    style={styles.searchInput}
-                    placeholder="Search people"
-                    placeholderTextColor={theme.mutedForegroundColor}
-                  />
-                </View>
+                <SearchField
+                  value={searchQuery}
+                  onChangeText={setSearchQuery}
+                  placeholder="Search people"
+                  containerClassName="mb-3 rounded-lg border border-border bg-card px-3"
+                />
                 {users
                   .filter((user) => {
                     const q = searchQuery.trim().toLowerCase()
@@ -360,57 +414,38 @@ export function Admin() {
                     const attended = attendanceMap[key] || false
                     const place = placementMap[key]
                     const placeNum = place == null || place < 1 ? null : place
-                    const placeLabel = placeNum == null ? '—' : ordinalPlacement(placeNum)
-                    const canDecrement = canPlacementDown(placeNum)
-                    const canIncrement = canPlacementUp(placeNum)
+                    const deckId = deckMap[key] ?? null
                     return (
                       <View key={user.id} style={styles.userRow}>
-                        <View style={styles.userIdentity}>
-                          <Text style={styles.userText}>{user.name}</Text>
+                        <Text style={styles.userText} numberOfLines={1}>
+                          {user.name}
+                        </Text>
+                        <View style={styles.userRowControls}>
+                          <DeckPicker
+                            compact
+                            showFieldLabel={false}
+                            value={deckId}
+                            suggestedDeckId={suggestedDeckMap[key] ?? null}
+                            onChange={(id) => setAttendanceDeck(user.id, eventId, id)}
+                          />
+                          <Input
+                            key={`place-${key}-${placeNum ?? 'x'}`}
+                            defaultValue={placeNum == null ? '' : String(placeNum)}
+                            onEndEditing={(e) =>
+                              setPlacementFromInput(user.id, eventId, e.nativeEvent.text)
+                            }
+                            keyboardType="number-pad"
+                            placeholder="#"
+                            returnKeyType="done"
+                            className="mb-0 h-11 w-14 min-w-[56px] px-2 text-center"
+                          />
+                          <ThemedButton
+                            label={attended ? 'Attended' : 'Mark'}
+                            variant={attended ? 'primary' : 'outline'}
+                            style={styles.attendanceAction}
+                            onPress={() => setAttendanceValue(user.id, eventId, !attended)}
+                          />
                         </View>
-                        <View style={styles.placementStepper}>
-                          <Pressable
-                            onPress={() => bumpPlacement(user.id, eventId, -1)}
-                            disabled={!canDecrement}
-                            style={({ pressed }) => [
-                              styles.placementStepperBtn,
-                              !canDecrement && styles.placementStepperBtnDimmed,
-                              pressed && canDecrement && styles.placementStepperBtnPressed,
-                            ]}
-                            accessibilityRole="button"
-                            accessibilityLabel="Decrease placement"
-                          >
-                            <Ionicons
-                              name="remove-outline"
-                              size={22}
-                              color={canDecrement ? theme.textColor : theme.mutedForegroundColor}
-                            />
-                          </Pressable>
-                          <Text style={styles.placementStepperLabel}>{placeLabel}</Text>
-                          <Pressable
-                            onPress={() => bumpPlacement(user.id, eventId, 1)}
-                            disabled={!canIncrement}
-                            style={({ pressed }) => [
-                              styles.placementStepperBtn,
-                              !canIncrement && styles.placementStepperBtnDimmed,
-                              pressed && canIncrement && styles.placementStepperBtnPressed,
-                            ]}
-                            accessibilityRole="button"
-                            accessibilityLabel="Increase placement"
-                          >
-                            <Ionicons
-                              name="add-outline"
-                              size={22}
-                              color={canIncrement ? theme.textColor : theme.mutedForegroundColor}
-                            />
-                          </Pressable>
-                        </View>
-                        <ThemedButton
-                          label={attended ? 'Attended' : 'Mark attended'}
-                          variant={attended ? 'primary' : 'outline'}
-                          style={styles.attendanceAction}
-                          onPress={() => setAttendanceValue(user.id, eventId, !attended)}
-                        />
                       </View>
                     )
                   })}
@@ -451,12 +486,7 @@ const getStyles = (theme: any) =>
       paddingTop: SPACING.xl,
     },
     tabRow: {
-      flexDirection: 'row',
-      gap: SPACING.md,
       marginBottom: SPACING.xl,
-    },
-    tabButton: {
-      flex: 1,
     },
     sectionTitle: {
       color: theme.textColor,
@@ -466,8 +496,9 @@ const getStyles = (theme: any) =>
     },
     input: {
       borderColor: theme.borderColor,
-      borderWidth: 1,
+      borderWidth: 1.5,
       borderRadius: RADIUS.md,
+      backgroundColor: theme.cardBackground ?? theme.backgroundColor,
       color: theme.textColor,
       paddingHorizontal: SPACING.md,
       paddingVertical: SPACING.md,
@@ -490,56 +521,20 @@ const getStyles = (theme: any) =>
     },
     userRow: {
       marginTop: SPACING.sm,
-      borderTopWidth: 1,
-      borderTopColor: theme.borderColor,
-      paddingTop: SPACING.sm,
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
+      borderWidth: 1.5,
+      borderColor: theme.borderColor,
+      borderRadius: RADIUS.lg,
+      padding: SPACING.sm,
       gap: SPACING.sm,
+      backgroundColor: theme.cardBackground ?? theme.backgroundColor,
     },
-    placementStepper: {
+    userRowControls: {
       flexDirection: 'row',
       alignItems: 'center',
-      borderWidth: 1,
-      borderColor: theme.borderColor,
-      borderRadius: RADIUS.md,
-      backgroundColor: theme.cardBackground,
-      overflow: 'hidden',
-      flexShrink: 0,
-    },
-    placementStepperBtn: {
-      width: 40,
-      height: 40,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    placementStepperBtnDimmed: {
-      opacity: 0.45,
-    },
-    placementStepperBtnPressed: {
-      opacity: 0.75,
-    },
-    placementStepperLabel: {
-      minWidth: 48,
-      paddingHorizontal: SPACING.xs,
-      textAlign: 'center',
-      fontFamily: theme.boldFont,
-      fontSize: TYPOGRAPHY.bodySmall,
-      color: theme.textColor,
-      borderLeftWidth: 1,
-      borderRightWidth: 1,
-      borderColor: theme.borderColor,
-      lineHeight: 40,
+      gap: SPACING.sm,
     },
     attendanceAction: {
       flexShrink: 0,
-    },
-    userIdentity: {
-      flex: 1,
-      paddingRight: SPACING.md,
-      justifyContent: 'center',
-      minHeight: 40,
     },
     userText: {
       color: theme.textColor,
@@ -548,14 +543,14 @@ const getStyles = (theme: any) =>
     },
     searchWrap: {
       borderColor: theme.borderColor,
-      borderWidth: 1,
+      borderWidth: 1.5,
       borderRadius: RADIUS.full,
       paddingHorizontal: SPACING.md,
       paddingVertical: SPACING.sm,
       flexDirection: 'row',
       alignItems: 'center',
       marginBottom: SPACING.sm,
-      backgroundColor: theme.cardBackground,
+      backgroundColor: theme.cardBackground ?? theme.backgroundColor,
     },
     searchInput: {
       flex: 1,
@@ -604,7 +599,7 @@ const getStyles = (theme: any) =>
       paddingVertical: SPACING.sm,
     },
     attendanceBannerTitleOnImg: {
-      color: '#fff',
+      color: theme.tintTextColor ?? BRAND.onImageText,
       fontFamily: theme.boldFont,
       fontSize: TYPOGRAPHY.body,
       textShadowColor: 'rgba(0,0,0,0.45)',
@@ -612,9 +607,23 @@ const getStyles = (theme: any) =>
       textShadowRadius: 4,
     },
     attendanceBannerTitleFallback: {
-      color: theme.tintTextColor ?? '#fff',
+      color: theme.tintTextColor ?? BRAND.onImageText,
       fontFamily: theme.boldFont,
       fontSize: TYPOGRAPHY.body,
+    },
+    attendanceBannerTierOnImg: {
+      marginTop: 2,
+      color: theme.tintTextColor ?? BRAND.onImageText,
+      fontFamily: theme.mediumFont,
+      fontSize: TYPOGRAPHY.caption,
+      opacity: 0.92,
+    },
+    attendanceBannerTierFallback: {
+      marginTop: 2,
+      color: theme.tintTextColor ?? BRAND.onImageText,
+      fontFamily: theme.mediumFont,
+      fontSize: TYPOGRAPHY.caption,
+      opacity: 0.9,
     },
     selectedEventTitle: {
       color: theme.textColor,
@@ -674,6 +683,9 @@ const getStyles = (theme: any) =>
     saveEvent: {
       marginTop: SPACING.md,
     },
+    tierTabs: {
+      marginBottom: SPACING.xs,
+    },
   })
 
 type AdminScreenStyles = ReturnType<typeof getStyles>
@@ -710,6 +722,14 @@ function AttendanceEventBanner({
             style={hasBanner ? styles.attendanceBannerTitleOnImg : styles.attendanceBannerTitleFallback}
           >
             {event.title}
+          </Text>
+          <Text
+            numberOfLines={1}
+            style={
+              hasBanner ? styles.attendanceBannerTierOnImg : styles.attendanceBannerTierFallback
+            }
+          >
+            {formatEventTierLabel(event.eventTier)}
           </Text>
         </View>
       </View>

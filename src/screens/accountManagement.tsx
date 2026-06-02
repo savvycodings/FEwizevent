@@ -13,9 +13,25 @@ import {
 import { pickImageWithSource } from '../utils/pickImageWithSource'
 import { AppContext, ThemeContext } from '../context'
 import { RADIUS, SPACING, TYPOGRAPHY } from '../constants/layout'
-import { ThemedButton, ThemedCard } from '../components'
+import { SegmentedTabs, ThemedButton, ThemedCard } from '../components'
 import { DOMAIN } from '../../constants'
 import { apiRequest } from '../api'
+import {
+  HOME_STORE_LABEL,
+  HOME_STORE_SEGMENT_OPTIONS,
+  type HomeStore,
+} from '../constants/stores'
+import type { User } from '../../types'
+
+function resolvedHomeStore(user: User | null): HomeStore {
+  const s = user?.homeStore
+  return s === 'glendower' || s === 'rosebank' ? s : 'glendower'
+}
+
+function storedHomeStore(user: User | null): HomeStore | null {
+  const s = user?.homeStore
+  return s === 'glendower' || s === 'rosebank' ? s : null
+}
 
 export function AccountManagement() {
   const { theme } = useContext(ThemeContext)
@@ -25,12 +41,19 @@ export function AccountManagement() {
   const [profileSaving, setProfileSaving] = useState(false)
   const [nameField, setNameField] = useState('')
   const [emailField, setEmailField] = useState('')
+  const [homeStore, setHomeStore] = useState<HomeStore>('glendower')
+  const [storeSaving, setStoreSaving] = useState(false)
 
   useEffect(() => {
     if (!currentUser) return
     setNameField(currentUser.name || '')
     setEmailField(currentUser.email || '')
-  }, [currentUser?.id, currentUser?.name, currentUser?.email])
+    setHomeStore(resolvedHomeStore(currentUser))
+  }, [currentUser?.id, currentUser?.name, currentUser?.email, currentUser?.homeStore])
+
+  function applyUserUpdate(user: User) {
+    setCurrentUser((prev) => (prev ? { ...prev, ...user } : user))
+  }
 
   async function pickAndUploadProfile() {
     if (!currentUser) return
@@ -65,12 +88,35 @@ export function AccountManagement() {
           imageUrl: uploadData.imageUrl,
         }),
       })
-      setCurrentUser(updateResult.user)
+      applyUserUpdate(updateResult.user)
       Alert.alert('Success', 'Profile picture updated')
     } catch (err: any) {
       Alert.alert('Update failed', err?.message || 'Please try again')
     } finally {
       setPhotoLoading(false)
+    }
+  }
+
+  async function persistHomeStore(next: HomeStore) {
+    if (!currentUser) return
+    const current = storedHomeStore(currentUser)
+    if (current === next) {
+      setHomeStore(next)
+      return
+    }
+    try {
+      setStoreSaving(true)
+      setHomeStore(next)
+      const updateResult = await apiRequest<{ user: User }>('/auth/profile', {
+        method: 'POST',
+        body: JSON.stringify({ userId: currentUser.id, homeStore: next }),
+      })
+      applyUserUpdate(updateResult.user)
+    } catch (err: any) {
+      setHomeStore(resolvedHomeStore(currentUser))
+      Alert.alert('Could not update store', err?.message || 'Please try again')
+    } finally {
+      setStoreSaving(false)
     }
   }
 
@@ -89,19 +135,25 @@ export function AccountManagement() {
 
     try {
       setProfileSaving(true)
-      const body: { userId: number; name?: string; email?: string } = { userId: currentUser.id }
+      const body: {
+        userId: number
+        name?: string
+        email?: string
+        homeStore?: HomeStore
+      } = { userId: currentUser.id }
       if (name !== currentUser.name) body.name = name
       if (email !== (currentUser.email || '').toLowerCase()) body.email = email
-      if (body.name === undefined && body.email === undefined) {
-        Alert.alert('No changes', 'Update your name or email to save.')
+      if (storedHomeStore(currentUser) !== homeStore) body.homeStore = homeStore
+      if (body.name === undefined && body.email === undefined && body.homeStore === undefined) {
+        Alert.alert('No changes', 'Update your name, email, or home store to save.')
         return
       }
 
-      const updateResult = await apiRequest<{ user: any }>('/auth/profile', {
+      const updateResult = await apiRequest<{ user: User }>('/auth/profile', {
         method: 'POST',
         body: JSON.stringify(body),
       })
-      setCurrentUser(updateResult.user)
+      applyUserUpdate(updateResult.user)
       Alert.alert('Success', 'Profile updated')
     } catch (err: any) {
       Alert.alert('Update failed', err?.message || 'Please try again')
@@ -164,6 +216,20 @@ export function AccountManagement() {
             autoCapitalize="none"
             keyboardType="email-address"
           />
+
+          <Text style={styles.label}>Home store</Text>
+          <Text style={styles.fieldHint}>
+            Used for {HOME_STORE_LABEL.glendower} and {HOME_STORE_LABEL.rosebank} store team standings.
+          </Text>
+          <SegmentedTabs<HomeStore>
+            style={styles.storeTabs}
+            value={homeStore}
+            onChange={persistHomeStore}
+            options={HOME_STORE_SEGMENT_OPTIONS}
+          />
+          {storeSaving ? (
+            <Text style={styles.storeSavingHint}>Updating home store…</Text>
+          ) : null}
 
           <ThemedButton
             label={profileSaving ? 'Saving...' : 'Save profile'}
@@ -249,12 +315,29 @@ const getStyles = (theme: any) =>
     },
     input: {
       borderColor: theme.borderColor,
-      borderWidth: 1,
+      borderWidth: 1.5,
       borderRadius: RADIUS.md,
+      backgroundColor: theme.cardBackground ?? theme.backgroundColor,
       color: theme.textColor,
       paddingHorizontal: SPACING.md,
       paddingVertical: SPACING.md,
       fontFamily: theme.regularFont,
       marginBottom: SPACING.md,
+    },
+    fieldHint: {
+      color: theme.mutedForegroundColor,
+      fontFamily: theme.regularFont,
+      fontSize: TYPOGRAPHY.caption,
+      lineHeight: TYPOGRAPHY.caption * 1.4,
+      marginBottom: SPACING.sm,
+    },
+    storeTabs: {
+      marginBottom: SPACING.sm,
+    },
+    storeSavingHint: {
+      color: theme.mutedForegroundColor,
+      fontFamily: theme.regularFont,
+      fontSize: TYPOGRAPHY.caption,
+      marginBottom: SPACING.lg,
     },
   })

@@ -11,14 +11,24 @@ import {
   useWindowDimensions,
 } from 'react-native'
 import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native'
-import Ionicons from '@expo/vector-icons/Ionicons'
+import { AppIcon } from '../components'
+import { BRAND } from '../constants/brandColors'
 import MaskedView from '@react-native-masked-view/masked-view'
 import { LinearGradient } from 'expo-linear-gradient'
 import { ThemeContext } from '../context'
 import { apiRequest } from '../api'
 import { RADIUS, SPACING, TYPOGRAPHY } from '../constants/layout'
-import { Section, ThemedCard, Surface, Divider } from '../components'
+import {
+  Divider,
+  LostToCell,
+  type LossOpponent,
+  Section,
+  Surface,
+  Text as UiText,
+  ThemedCard,
+} from '../components'
 import { formatLocationLabel } from '../utils/formatLocationLabel'
+import { EVENT_TIER_LABEL, formatTierMultiplier, type EventTier } from '../constants/eventTiers'
 
 type ApiEvent = {
   id: number
@@ -28,6 +38,7 @@ type ApiEvent = {
   bannerImageUrl?: string | null
   scheduledRounds?: number | null
   useMatchTracking?: boolean
+  eventTier?: EventTier | string | null
 }
 
 type LeaderboardEntry = {
@@ -43,6 +54,8 @@ type LeaderboardEntry = {
   draws: number
   lostToUserId: number | null
   lostToName: string | null
+  lostToDeckId: string | null
+  lossesTo: LossOpponent[]
 }
 
 type EventLeaderboardResponse = {
@@ -54,7 +67,7 @@ type EventLeaderboardResponse = {
   }
 }
 
-const TABLE_MIN_WIDTH = 560
+const TABLE_MIN_WIDTH = 640
 const COL = {
   place: 48,
   player: 168,
@@ -62,7 +75,7 @@ const COL = {
   w: 36,
   l: 36,
   d: 36,
-  lost: 120,
+  lost: 200,
 }
 
 const MEDAL_GRADIENTS: Record<1 | 2 | 3, [string, string, string]> = {
@@ -103,6 +116,49 @@ const stylesForGradient = StyleSheet.create({
   },
 })
 
+function normalizeLossesTo(
+  raw: unknown,
+  row: {
+    lostToUserId?: number | null
+    lostToName?: string | null
+    lostToDeckId?: string | null
+  }
+): LossOpponent[] {
+  if (Array.isArray(raw)) {
+    return raw
+      .map((item) => {
+        if (!item || typeof item !== 'object') return null
+        const o = item as Record<string, unknown>
+        const userId = Number(o.userId)
+        const name = String(o.name ?? '')
+        if (!userId || !name) return null
+        return {
+          userId,
+          name,
+          deckId: o.deckId == null ? null : String(o.deckId),
+        }
+      })
+      .filter(Boolean) as LossOpponent[]
+  }
+  if (typeof raw === 'string') {
+    try {
+      return normalizeLossesTo(JSON.parse(raw), row)
+    } catch {
+      /* fall through */
+    }
+  }
+  if (row.lostToUserId && row.lostToName) {
+    return [
+      {
+        userId: row.lostToUserId,
+        name: row.lostToName,
+        deckId: row.lostToDeckId ?? null,
+      },
+    ]
+  }
+  return []
+}
+
 function formatEventDateLabel(eventDate: string | null): string {
   if (!eventDate) return 'Date TBA'
   const normalized = eventDate.includes('T') ? eventDate : `${eventDate}T12:00:00`
@@ -141,7 +197,7 @@ export function EventPage() {
   const col = useMemo(
     () =>
       isWideLayout
-        ? { ...COL, player: 220, lost: 140 }
+        ? { ...COL, player: 220, lost: 280 }
         : COL,
     [isWideLayout]
   )
@@ -177,6 +233,7 @@ export function EventPage() {
           wins: Number(r.wins ?? 0),
           losses: Number(r.losses ?? 0),
           draws: Number(r.draws ?? 0),
+          lossesTo: normalizeLossesTo(r.lossesTo, r),
         }))
       )
       setStats(res.stats || { attendeeCount: 0, participantCount: 0 })
@@ -197,6 +254,11 @@ export function EventPage() {
 
   const dateLabel = formatEventDateLabel(event?.eventDate ?? null)
   const locationLabel = formatLocationLabel(event?.location)
+  const tier =
+    event?.eventTier === 'challenge' || event?.eventTier === 'cup' || event?.eventTier === 'casual'
+      ? event.eventTier
+      : 'casual'
+  const tierLabel = `${EVENT_TIER_LABEL[tier]} · ${formatTierMultiplier(tier)} XP`
 
   return (
     <ScrollView
@@ -223,7 +285,7 @@ export function EventPage() {
               accessibilityRole="button"
               accessibilityLabel="Go back"
             >
-              <Ionicons name="arrow-back-outline" size={22} color="#000" />
+              <AppIcon name="arrow-back" size={22} color={BRAND.heroInk} />
             </Pressable>
             <Text style={styles.heroTitle}>{event?.title || 'Event'}</Text>
           </View>
@@ -232,6 +294,7 @@ export function EventPage() {
 
       <View style={styles.surface}>
         <View style={styles.metaBlock}>
+          <Text style={styles.metaText}>{tierLabel}</Text>
           <Text style={styles.metaText}>{dateLabel}</Text>
           <Text style={styles.metaText}>{locationLabel}</Text>
         </View>
@@ -260,13 +323,12 @@ export function EventPage() {
         >
           {loading ? (
             <ThemedCard style={styles.emptyCard}>
-              <Text style={styles.emptyText}>Loading leaderboard...</Text>
+              <UiText variant="muted">Loading leaderboard...</UiText>
             </ThemedCard>
           ) : leaderboard.length > 0 ? (
-            <Surface padding="none" style={styles.tableCard}>
-              <ScrollView horizontal showsHorizontalScrollIndicator nestedScrollEnabled>
-                <View style={[styles.tableInner, { minWidth: tableMinWidth }]}>
-                  <View style={styles.tableHeaderRow}>
+            <ScrollView horizontal showsHorizontalScrollIndicator nestedScrollEnabled>
+              <View style={[styles.tableInner, { minWidth: tableMinWidth }]}>
+                <View style={styles.tableHeaderRow}>
                     <Text style={[styles.th, { width: col.place }]}>#</Text>
                     <Text style={[styles.th, { width: col.player }]}>Player</Text>
                     <Text style={[styles.th, { width: col.gp }]}>GP</Text>
@@ -312,23 +374,26 @@ export function EventPage() {
                         <Text style={[styles.tdNum, { width: col.w }]}>{entry.wins}</Text>
                         <Text style={[styles.tdNum, { width: col.l }]}>{entry.losses}</Text>
                         <Text style={[styles.tdNum, { width: col.d }]}>{entry.draws}</Text>
-                        <Text style={[styles.tdLost, { width: col.lost }]} numberOfLines={2}>
-                          {entry.lostToName || '—'}
-                        </Text>
+                        <View style={[styles.tdLostWrap, { width: col.lost }]}>
+                          <LostToCell
+                            opponents={entry.lossesTo}
+                            textStyle={styles.tdLost}
+                            iconSize={18}
+                          />
+                        </View>
                       </View>
                       <View style={styles.rowRule} />
                     </Pressable>
                   ))}
-                </View>
-              </ScrollView>
-            </Surface>
+              </View>
+            </ScrollView>
           ) : (
             <ThemedCard style={styles.emptyCard}>
-              <Text style={styles.emptyText}>
+              <UiText variant="muted">
                 {stats.attendeeCount > 0
                   ? 'No attendees to show.'
                   : 'Mark players as attended to appear on the leaderboard.'}
-              </Text>
+              </UiText>
             </ThemedCard>
           )}
         </Section>
@@ -371,7 +436,7 @@ const getStyles = (theme: any) =>
       position: 'relative',
     },
     heroTitle: {
-      color: '#000',
+      color: BRAND.heroInk,
       fontFamily: theme.boldFont,
       fontSize: TYPOGRAPHY.h2,
       flexShrink: 1,
@@ -427,13 +492,9 @@ const getStyles = (theme: any) =>
       fontFamily: theme.regularFont,
       fontSize: TYPOGRAPHY.caption,
     },
-    tableCard: {
-      padding: 0,
-      overflow: 'hidden',
-    },
     tableInner: {
       minWidth: TABLE_MIN_WIDTH,
-      padding: SPACING.md,
+      paddingVertical: SPACING.xs,
     },
     tableHeaderRow: {
       flexDirection: 'row',
@@ -495,6 +556,10 @@ const getStyles = (theme: any) =>
       fontFamily: theme.mediumFont,
       fontSize: TYPOGRAPHY.bodySmall,
       textAlign: 'center',
+    },
+    tdLostWrap: {
+      justifyContent: 'center',
+      minWidth: 0,
     },
     tdLost: {
       color: theme.mutedForegroundColor,

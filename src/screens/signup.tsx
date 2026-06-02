@@ -1,7 +1,13 @@
 import { useContext, useState } from 'react'
 import { Alert, Image, StyleSheet, Text, TextInput, View } from 'react-native'
 import { AppContext, ThemeContext } from '../context'
-import { ThemedButton, ThemedCard } from '../components'
+import { ThemedButton, ThemedCard, SegmentedTabs } from '../components'
+import { DeckPicker } from '../components/content/DeckPicker'
+import {
+  HOME_STORE_LABEL,
+  HOME_STORE_SEGMENT_OPTIONS,
+  type HomeStore,
+} from '../constants/stores'
 import { RADIUS, SPACING, TYPOGRAPHY } from '../constants/layout'
 import { apiRequest, readJsonResponse } from '../api'
 import { pickImageWithSource } from '../utils/pickImageWithSource'
@@ -15,6 +21,8 @@ export function Signup() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [profileImage, setProfileImage] = useState<any>(null)
+  const [homeStore, setHomeStore] = useState<HomeStore>('glendower')
+  const [deckId, setDeckId] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
   async function pickProfileImage() {
@@ -45,12 +53,23 @@ export function Signup() {
   }
 
   async function onSignup() {
+    if (!name.trim() || !email.trim() || !password || !deckId) {
+      Alert.alert('Missing fields', 'Name, email, password, home store, and deck are required.')
+      return
+    }
     try {
       setLoading(true)
       const profileImageUrl = await uploadProfileImageIfAny()
       const result = await apiRequest<{ user: any }>('/auth/signup', {
         method: 'POST',
-        body: JSON.stringify({ name, email, password, profileImageUrl }),
+        body: JSON.stringify({
+          name: name.trim(),
+          email: email.trim(),
+          password,
+          profileImageUrl,
+          homeStore,
+          deckId,
+        }),
       })
       setCurrentUser(result.user)
     } catch (err: any) {
@@ -64,11 +83,11 @@ export function Signup() {
     <View style={styles.screen}>
       <View style={styles.hero}>
         <Text style={styles.heroTitle}>Create Account</Text>
-        <Text style={styles.heroSubtitle}>Sign up with name, email, and password.</Text>
+        <Text style={styles.heroSubtitle}>Pick your store, deck, and create your account.</Text>
       </View>
 
       <View style={styles.surface}>
-        <ThemedCard premiumRim>
+        <ThemedCard>
           <Text style={styles.title}>Sign Up</Text>
           <ThemedButton
             label={profileImage ? 'Change profile picture' : 'Add profile picture'}
@@ -99,6 +118,24 @@ export function Signup() {
             secureTextEntry
             value={password}
             onChangeText={setPassword}
+          />
+          <Text style={styles.storeLabel}>Home store</Text>
+          <Text style={styles.storeHint}>
+            Used for per-store standings ({HOME_STORE_LABEL.glendower} & {HOME_STORE_LABEL.rosebank}).
+          </Text>
+          <SegmentedTabs<HomeStore>
+            style={styles.storeTabs}
+            value={homeStore}
+            onChange={setHomeStore}
+            options={HOME_STORE_SEGMENT_OPTIONS}
+          />
+          <DeckPicker
+            variant="profile"
+            value={deckId}
+            onChange={setDeckId}
+            label="Current deck"
+            showFieldLabel={false}
+            placeholder="Tap to choose deck"
           />
           <ThemedButton label={loading ? 'Creating...' : 'Sign Up'} onPress={onSignup} />
         </ThemedCard>
@@ -148,8 +185,9 @@ const getStyles = (theme: any) =>
     },
     input: {
       borderColor: theme.borderColor,
-      borderWidth: 1,
+      borderWidth: 1.5,
       borderRadius: RADIUS.md,
+      backgroundColor: theme.cardBackground ?? theme.backgroundColor,
       color: theme.textColor,
       paddingHorizontal: SPACING.md,
       paddingVertical: SPACING.md,
@@ -157,6 +195,23 @@ const getStyles = (theme: any) =>
       marginBottom: SPACING.md,
     },
     imageButton: {
+      marginBottom: SPACING.md,
+    },
+    storeLabel: {
+      color: theme.textColor,
+      fontFamily: theme.semiBoldFont,
+      fontSize: TYPOGRAPHY.bodySmall,
+      marginTop: SPACING.sm,
+      marginBottom: SPACING.xs,
+    },
+    storeHint: {
+      color: theme.mutedForegroundColor,
+      fontFamily: theme.regularFont,
+      fontSize: TYPOGRAPHY.caption,
+      lineHeight: TYPOGRAPHY.caption * 1.4,
+      marginBottom: SPACING.sm,
+    },
+    storeTabs: {
       marginBottom: SPACING.md,
     },
     preview: {

@@ -10,7 +10,7 @@ import {
   View,
 } from 'react-native'
 import { AppContext, ThemeContext } from '../context'
-import { Divider, ListRowCard, Section, Surface, ThemedButton } from '../components'
+import { Divider, ListRowCard, ScreenHero, ScreenSurface, Section, Surface, ThemedButton } from '../components'
 import { RADIUS, SPACING, TAB_BAR_HEIGHT, TYPOGRAPHY } from '../constants/layout'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { menuGroups } from '../data/mockData'
@@ -65,12 +65,9 @@ export function Menu({ navigation }: { navigation: any }) {
       style={styles.screen}
       contentContainerStyle={[styles.content, { paddingBottom: scrollBottom }]}
     >
-      <View style={styles.hero}>
-        <Text style={styles.heroTitle}>Menu</Text>
-        <Text style={styles.heroSubtitle}>Shortcuts, settings, and account.</Text>
-      </View>
+      <ScreenHero title="Menu" subtitle="Shortcuts, settings, and account." />
 
-      <View style={styles.surface}>
+      <ScreenSurface>
         <Surface variant="muted" padding="lg">
           <Text style={styles.accountName}>{currentUser?.name || 'Guest'}</Text>
           {currentUser?.email ? (
@@ -102,24 +99,18 @@ export function Menu({ navigation }: { navigation: any }) {
           </Section>
         ))}
 
-        <Section title="Admin" subtitle="Organizer tools (password required)." compactTopSpacing>
-          <ListRowCard
-            title="Admin hub"
-            subtitle="Manage attendance and events"
-            onPress={openAdminHub}
-            style={styles.rowLast}
-          />
+        <Section title="Admin" compactTopSpacing>
+          <ThemedButton label="Admin hub" onPress={openAdminHub} />
         </Section>
 
         <Section title="Session" compactTopSpacing>
-          <ListRowCard
-            title="Log Out"
-            subtitle={currentUser?.email || 'End this session'}
+          <ThemedButton
+            label="Log out"
+            variant="outline"
             onPress={() => setCurrentUser(null)}
-            style={styles.rowLast}
           />
         </Section>
-      </View>
+      </ScreenSurface>
 
       <Modal
         visible={adminModalVisible}
@@ -171,34 +162,6 @@ const getStyles = (theme: any) =>
     content: {
       flexGrow: 1,
     },
-    hero: {
-      backgroundColor: theme.tintColor,
-      paddingHorizontal: SPACING.containerPadding,
-      paddingTop: SPACING['2xl'],
-      paddingBottom: SPACING['3xl'],
-    },
-    heroTitle: {
-      color: theme.backgroundColor,
-      fontFamily: theme.boldFont,
-      fontSize: TYPOGRAPHY.h2,
-    },
-    heroSubtitle: {
-      marginTop: SPACING.sm,
-      color: theme.backgroundColor,
-      fontFamily: theme.regularFont,
-      fontSize: TYPOGRAPHY.bodySmall,
-      opacity: 0.92,
-      lineHeight: TYPOGRAPHY.bodySmall * 1.4,
-    },
-    surface: {
-      marginTop: -SPACING['2xl'],
-      borderTopLeftRadius: RADIUS.xl,
-      borderTopRightRadius: RADIUS.xl,
-      backgroundColor: theme.backgroundColor,
-      paddingHorizontal: SPACING.containerPadding,
-      paddingTop: SPACING.xl,
-      paddingBottom: SPACING.lg,
-    },
     accountName: {
       color: theme.textColor,
       fontFamily: theme.boldFont,
@@ -228,7 +191,7 @@ const getStyles = (theme: any) =>
       backgroundColor: theme.cardBackground ?? theme.backgroundColor,
       borderRadius: RADIUS.lg,
       padding: SPACING.xl,
-      borderWidth: StyleSheet.hairlineWidth,
+      borderWidth: 1.5,
       borderColor: theme.borderColor,
     },
     modalTitle: {
@@ -245,11 +208,13 @@ const getStyles = (theme: any) =>
     },
     modalInput: {
       marginTop: SPACING.lg,
-      borderWidth: 1,
+      borderWidth: 1.5,
       borderColor: theme.borderColor,
-      borderRadius: RADIUS.md,
+      borderRadius: RADIUS.lg,
+      backgroundColor: theme.surfaceMuted ?? theme.cardBackground ?? theme.backgroundColor,
       paddingHorizontal: SPACING.md,
       paddingVertical: SPACING.md,
+      minHeight: 48,
       color: theme.textColor,
       fontFamily: theme.regularFont,
       fontSize: TYPOGRAPHY.body,

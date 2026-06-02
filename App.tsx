@@ -1,3 +1,4 @@
+import './global.css'
 import 'react-native-gesture-handler'
 import { useState, useEffect, useRef } from 'react'
 import { NavigationContainer } from '@react-navigation/native'
@@ -18,7 +19,8 @@ import {
   BottomSheetModalProvider,
   BottomSheetView,
 } from '@gorhom/bottom-sheet'
-import { StyleSheet, LogBox } from 'react-native'
+import { StyleSheet, LogBox, View } from 'react-native'
+import { PortalHost } from '@rn-primitives/portal'
 import { StatusBar } from 'expo-status-bar'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 import { linking } from './src/navigation/linking'
@@ -120,6 +122,7 @@ export default function App() {
   if (!fontsLoaded || !authReady) return null
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
+      <View className="dark flex-1 bg-background">
       <SafeAreaProvider>
       <AppContext.Provider
         value={{
@@ -166,6 +169,8 @@ export default function App() {
         </ThemeContext.Provider>
       </AppContext.Provider>
       </SafeAreaProvider>
+      <PortalHost />
+      </View>
     </GestureHandlerRootView>
   )
 }

@@ -1,9 +1,10 @@
 import { useCallback, useContext, useState } from 'react'
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { useFocusEffect } from '@react-navigation/native'
-import Ionicons from '@expo/vector-icons/Ionicons'
+import { AppIcon, DeckIcon, ScreenHero, ScreenSurface, Surface, ToolbarRow } from '../components'
+import { deckShortLabelForId } from '../constants/deckCatalog'
+import { rowGrow } from '../components/layout/PressableRow'
 import { AppContext, ThemeContext } from '../context'
-import { Surface } from '../components'
 import { RADIUS, SPACING, TYPOGRAPHY } from '../constants/layout'
 import { apiRequest } from '../api'
 
@@ -14,6 +15,7 @@ type AttendedEventItem = {
   eventDate: string | null
   markedAt: string
   placement?: number | null
+  deckId?: string | null
 }
 
 function ordinalPlacement(n: number): string {
@@ -96,22 +98,22 @@ export function AttendedEvents({ navigation }: { navigation: any }) {
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
-      <View style={styles.hero}>
-        <Text style={styles.heroTitle}>Attended events</Text>
-        <Text style={styles.heroSubtitle}>Every tournament you have been marked attended at.</Text>
-      </View>
+      <ScreenHero
+        title="Attended events"
+        subtitle="Every tournament you have been marked attended at."
+      />
 
-      <View style={styles.surface}>
+      <ScreenSurface style={{ gap: SPACING.md }}>
         {!currentUser?.id ? (
           <View style={styles.emptyWrap}>
-            <Ionicons name="person-outline" size={28} color={theme.mutedForegroundColor} />
+            <AppIcon name="user" size={28} color={theme.mutedForegroundColor} />
             <Text style={styles.emptyText}>Sign in to see your attended events.</Text>
           </View>
         ) : loading ? (
           <ActivityIndicator color={theme.tintColor} style={styles.loader} />
         ) : events.length === 0 ? (
           <View style={styles.emptyWrap}>
-            <Ionicons name="calendar-outline" size={28} color={theme.mutedForegroundColor} />
+            <AppIcon name="calendar" size={28} color={theme.mutedForegroundColor} />
             <Text style={styles.emptyText}>
               No attended events yet. When an admin marks you attended, they will show up here.
             </Text>
@@ -143,16 +145,26 @@ export function AttendedEvents({ navigation }: { navigation: any }) {
                     {formatEventDateLabel(item.eventDate)}
                     {place != null ? ` · ${ordinalPlacement(place)} place` : ''}
                   </Text>
-                  <View style={styles.readRow}>
-                    <Text style={styles.readMore}>View event</Text>
-                    <Ionicons name="chevron-forward" size={18} color={theme.tintColor} />
-                  </View>
+                  {item.deckId ? (
+                    <View style={styles.deckRow}>
+                      <DeckIcon deckId={item.deckId} size={18} />
+                      <Text style={styles.deckText}>{deckShortLabelForId(item.deckId)}</Text>
+                    </View>
+                  ) : null}
+                  <ToolbarRow style={styles.readRow}>
+                    <Text style={[rowGrow.text, styles.readMore]} numberOfLines={1}>
+                      View event
+                    </Text>
+                    <View style={rowGrow.end}>
+                      <AppIcon name="chevron-right" size={18} color={theme.tintColor} />
+                    </View>
+                  </ToolbarRow>
                 </Surface>
               </Pressable>
             )
           })
         )}
-      </View>
+      </ScreenSurface>
     </ScrollView>
   )
 }
@@ -165,35 +177,6 @@ const getStyles = (theme: any) =>
     },
     content: {
       paddingBottom: SPACING['4xl'],
-    },
-    hero: {
-      backgroundColor: theme.tintColor,
-      paddingHorizontal: SPACING.containerPadding,
-      paddingTop: SPACING['2xl'],
-      paddingBottom: SPACING['3xl'],
-    },
-    heroTitle: {
-      color: theme.backgroundColor,
-      fontFamily: theme.boldFont,
-      fontSize: TYPOGRAPHY.h2,
-    },
-    heroSubtitle: {
-      marginTop: SPACING.sm,
-      color: theme.backgroundColor,
-      fontFamily: theme.regularFont,
-      fontSize: TYPOGRAPHY.bodySmall,
-      opacity: 0.92,
-      lineHeight: TYPOGRAPHY.bodySmall * 1.4,
-    },
-    surface: {
-      marginTop: -SPACING['2xl'],
-      borderTopLeftRadius: RADIUS.xl,
-      borderTopRightRadius: RADIUS.xl,
-      backgroundColor: theme.backgroundColor,
-      paddingHorizontal: SPACING.containerPadding,
-      paddingTop: SPACING.xl,
-      gap: SPACING.md,
-      minHeight: 200,
     },
     loader: {
       marginVertical: SPACING['2xl'],
@@ -264,13 +247,20 @@ const getStyles = (theme: any) =>
       fontFamily: theme.regularFont,
       fontSize: TYPOGRAPHY.bodySmall,
       lineHeight: TYPOGRAPHY.bodySmall * 1.45,
-      marginBottom: SPACING.md,
+      marginBottom: SPACING.sm,
     },
-    readRow: {
+    deckRow: {
       flexDirection: 'row',
       alignItems: 'center',
-      justifyContent: 'space-between',
+      gap: SPACING.xs,
+      marginBottom: SPACING.md,
     },
+    deckText: {
+      color: theme.mutedForegroundColor,
+      fontFamily: theme.mediumFont,
+      fontSize: TYPOGRAPHY.caption,
+    },
+    readRow: {},
     readMore: {
       color: theme.tintColor,
       fontFamily: theme.semiBoldFont,
