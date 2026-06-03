@@ -28,7 +28,7 @@ type DeckPickerProps = {
   /** Profile: inline label + icon, one bordered capsule around the control. */
   /** Hero: compact pill on home header (matches rank pill). */
   /** Hero icon: deck glyph only, inline beside the player name. */
-  variant?: 'default' | 'profile' | 'hero' | 'heroIcon'
+  variant?: 'default' | 'profile' | 'hero' | 'heroIcon' | 'field'
   /** Profile deck hint when event deck is not set yet (admin UI only; not saved until picked). */
   suggestedDeckId?: string | null
 }
@@ -52,6 +52,7 @@ export function DeckPicker({
   const isProfile = variant === 'profile'
   const isHero = variant === 'hero'
   const isHeroIcon = variant === 'heroIcon'
+  const isField = variant === 'field'
 
   const profileLabel = label.trim().replace(/:+$/, '')
   const suggested = DECK_CATALOG.find((d) => d.id === suggestedDeckId)
@@ -64,6 +65,7 @@ export function DeckPicker({
     ? deckShortLabelForId(selected.id) || selected.label
     : placeholder
   const profileLine = `${profileLabel}: ${deckName}`
+  const fieldLine = selected?.label ?? resolvedPlaceholder
 
   const trigger = (
     <PressableRow
@@ -83,6 +85,10 @@ export function DeckPicker({
             ? selected
               ? `${profileLabel}: ${selected.label}. Change deck`
               : placeholder
+            : isField
+              ? selected
+                ? `Deck: ${selected.label}. Change deck`
+                : placeholder
             : selected
               ? `Deck: ${selected.label}. Change deck`
               : placeholder
@@ -95,8 +101,10 @@ export function DeckPicker({
           ? styles.heroTrigger
           : isProfile
             ? styles.profileTrigger
-            : styles.trigger,
-        !isProfile && !isHero && !isHeroIcon && compact && styles.triggerCompact,
+            : isField
+              ? styles.fieldTrigger
+              : styles.trigger,
+        !isProfile && !isHero && !isHeroIcon && !isField && compact && styles.triggerCompact,
         disabled && styles.triggerDisabled,
         pressed && !disabled && styles.triggerPressed,
       ]}
@@ -127,6 +135,24 @@ export function DeckPicker({
             <AppIcon name="chevron-down" size={18} color={theme.mutedForegroundColor} />
           </View>
         </>
+      ) : isField ? (
+        <>
+          <DeckIcon deckId={value} size={22} />
+          <Text
+            style={[
+              rowGrow.text,
+              styles.fieldLineText,
+              !selected && styles.fieldPlaceholder,
+            ]}
+            numberOfLines={1}
+            ellipsizeMode="tail"
+          >
+            {fieldLine}
+          </Text>
+          <View style={rowGrow.end}>
+            <AppIcon name="chevron-down" size={18} color={theme.mutedForegroundColor} />
+          </View>
+        </>
       ) : (
         <>
           <DeckIcon deckId={value} size={22} />
@@ -148,7 +174,7 @@ export function DeckPicker({
   return (
     <>
       <View style={[styles.wrap, compact && styles.wrapCompact, isHero && styles.wrapHero, isHeroIcon && styles.wrapHeroIcon]}>
-        {!isProfile && !isHero && !isHeroIcon && showFieldLabel && !compact ? (
+        {!isProfile && !isHero && !isHeroIcon && !isField && showFieldLabel && !compact ? (
           <Text style={styles.fieldLabel}>{label}</Text>
         ) : null}
         {trigger}
@@ -272,6 +298,25 @@ const getStyles = (theme: any) =>
       color: theme.mutedForegroundColor,
       fontFamily: theme.regularFont,
       fontSize: TYPOGRAPHY.bodySmall,
+    },
+    fieldTrigger: {
+      width: '100%',
+      alignSelf: 'stretch',
+      minHeight: 48,
+      paddingHorizontal: SPACING.md,
+      paddingVertical: SPACING.md,
+      borderWidth: 1.5,
+      borderColor: theme.borderColor,
+      borderRadius: RADIUS.md,
+      backgroundColor: theme.cardBackground ?? theme.backgroundColor,
+    },
+    fieldLineText: {
+      color: theme.textColor,
+      fontFamily: theme.regularFont,
+      fontSize: TYPOGRAPHY.body,
+    },
+    fieldPlaceholder: {
+      color: theme.mutedForegroundColor,
     },
     trigger: {
       minHeight: 48,

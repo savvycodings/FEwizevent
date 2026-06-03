@@ -1,13 +1,9 @@
 import { useContext, useState } from 'react'
 import { Alert, Image, StyleSheet, Text, TextInput, View } from 'react-native'
 import { AppContext, ThemeContext } from '../context'
-import { ThemedButton, ThemedCard, SegmentedTabs } from '../components'
+import { ThemedButton, ThemedCard, HomeStoreTabs } from '../components'
 import { DeckPicker } from '../components/content/DeckPicker'
-import {
-  HOME_STORE_LABEL,
-  HOME_STORE_SEGMENT_OPTIONS,
-  type HomeStore,
-} from '../constants/stores'
+import { type HomeStore } from '../constants/stores'
 import { RADIUS, SPACING, TYPOGRAPHY } from '../constants/layout'
 import { apiRequest, readJsonResponse } from '../api'
 import { pickImageWithSource } from '../utils/pickImageWithSource'
@@ -89,7 +85,6 @@ export function Signup() {
     <View style={styles.screen}>
       <View style={styles.hero}>
         <Text style={styles.heroTitle}>Create Account</Text>
-        <Text style={styles.heroSubtitle}>Pick your store, deck, and create your account.</Text>
       </View>
 
       <View style={styles.surface}>
@@ -118,9 +113,6 @@ export function Signup() {
             value={popId}
             onChangeText={setPopId}
           />
-          <Text style={styles.popHint}>
-            Same number as in tournament files (userid). Used when importing pairings from TDF.
-          </Text>
           <TextInput
             style={styles.input}
             placeholder="Email"
@@ -138,23 +130,17 @@ export function Signup() {
             onChangeText={setPassword}
           />
           <Text style={styles.storeLabel}>Home store</Text>
-          <Text style={styles.storeHint}>
-            Used for per-store standings ({HOME_STORE_LABEL.glendower} & {HOME_STORE_LABEL.rosebank}).
-          </Text>
-          <SegmentedTabs<HomeStore>
-            style={styles.storeTabs}
-            value={homeStore}
-            onChange={setHomeStore}
-            options={HOME_STORE_SEGMENT_OPTIONS}
-          />
-          <DeckPicker
-            variant="profile"
-            value={deckId}
-            onChange={setDeckId}
-            label="Current deck"
-            showFieldLabel={false}
-            placeholder="Tap to choose deck"
-          />
+          <HomeStoreTabs style={styles.storeTabs} value={homeStore} onChange={setHomeStore} />
+          <Text style={styles.storeLabel}>Current deck</Text>
+          <View style={styles.deckField}>
+            <DeckPicker
+              variant="field"
+              value={deckId}
+              onChange={setDeckId}
+              showFieldLabel={false}
+              placeholder="Tap to choose a deck"
+            />
+          </View>
           <ThemedButton label={loading ? 'Creating...' : 'Sign Up'} onPress={onSignup} />
         </ThemedCard>
       </View>
@@ -178,13 +164,6 @@ const getStyles = (theme: any) =>
       color: theme.backgroundColor,
       fontFamily: theme.boldFont,
       fontSize: TYPOGRAPHY.h2,
-    },
-    heroSubtitle: {
-      color: theme.backgroundColor,
-      fontFamily: theme.mediumFont,
-      fontSize: TYPOGRAPHY.bodySmall,
-      marginTop: SPACING.sm,
-      opacity: 0.9,
     },
     surface: {
       flex: 1,
@@ -220,24 +199,12 @@ const getStyles = (theme: any) =>
       fontFamily: theme.semiBoldFont,
       fontSize: TYPOGRAPHY.bodySmall,
       marginTop: SPACING.sm,
-      marginBottom: SPACING.xs,
-    },
-    popHint: {
-      color: theme.mutedForegroundColor,
-      fontFamily: theme.regularFont,
-      fontSize: TYPOGRAPHY.caption,
-      lineHeight: TYPOGRAPHY.caption * 1.4,
-      marginTop: -SPACING.sm,
-      marginBottom: SPACING.md,
-    },
-    storeHint: {
-      color: theme.mutedForegroundColor,
-      fontFamily: theme.regularFont,
-      fontSize: TYPOGRAPHY.caption,
-      lineHeight: TYPOGRAPHY.caption * 1.4,
       marginBottom: SPACING.sm,
     },
     storeTabs: {
+      marginBottom: SPACING.md,
+    },
+    deckField: {
       marginBottom: SPACING.md,
     },
     preview: {
