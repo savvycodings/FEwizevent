@@ -87,7 +87,7 @@ export function RankingLeaderboard() {
             accessibilityLabel={`View stats for ${row.name}`}
           >
           <ThemedCard premiumRim={index < 3} style={styles.rowCard}>
-            <CardCaption caption={`${row.rank} · ${row.xp} XP`}>
+            <CardCaption caption={`${row.rank} · ${row.xp} season XP`}>
               <View style={styles.rowInner}>
                 <MedalGradientText
                   place={index + 1}

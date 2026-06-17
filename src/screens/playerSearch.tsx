@@ -145,7 +145,7 @@ export function PlayerSearch({ navigation }: { navigation: any }) {
                         {player.name}
                       </Text>
                       <Text style={styles.playerMeta} numberOfLines={1}>
-                        {player.rank} · {player.xp} XP
+                        {player.rank} · {player.xp} season XP
                       </Text>
                     </View>
                     <Image source={rankBadge} style={styles.rankIcon} resizeMode="contain" />

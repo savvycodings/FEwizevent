@@ -152,13 +152,6 @@ function TotalsBarChart({
     setFocused(nearestTotalsBar(locationX, chart.pair))
   }
 
-  const active =
-    focused === 'primary' && !primaryPending
-      ? { side: 'primary' as const, ...chart!.pair.primary, rank: primaryRank ?? '', xp: primaryXp ?? 0 }
-      : focused === 'compare'
-        ? { side: 'compare' as const, ...chart!.pair.compare, rank: compareRank }
-        : null
-
   return (
     <View className={cn('w-full', className)} onLayout={(e) => setWidth(e.nativeEvent.layout.width)}>
       <Text variant="muted" className="mb-2 text-center text-[11px]">
@@ -167,6 +160,7 @@ function TotalsBarChart({
       {width < 40 || !chart ? (
         <View style={{ height }} />
       ) : (
+        <>
         <View
           style={{ height }}
           onStartShouldSetResponder={() => true}
@@ -224,34 +218,40 @@ function TotalsBarChart({
             })}
           </Svg>
         </View>
+
+        <View style={{ width, height: 52, marginTop: 4 }}>
+          {(['primary', 'compare'] as const).map((side) => {
+            const item = chart.pair[side]
+            const name = side === 'primary' ? youLabel : themLabel
+            const rank = side === 'primary' ? primaryRank : compareRank
+            const xp = side === 'primary' ? primaryXp : compareXp
+            const pending = side === 'primary' && primaryPending
+            return (
+              <View
+                key={side}
+                style={{
+                  position: 'absolute',
+                  left: item.centerX - item.bar.width / 2,
+                  width: item.bar.width,
+                  alignItems: 'center',
+                }}
+              >
+                <Text className="w-full text-center text-xs font-semibold text-foreground" numberOfLines={1}>
+                  {name}
+                </Text>
+                {pending ? (
+                  <View className="mt-1 h-3 w-full max-w-[80px] rounded bg-accent" />
+                ) : (
+                  <Text variant="muted" className="text-center text-[11px]" numberOfLines={2}>
+                    {rank} · {xp} XP
+                  </Text>
+                )}
+              </View>
+            )
+          })}
+        </View>
+        </>
       )}
-
-      <View className="mt-4 flex-row justify-center gap-8 px-2">
-        <View className="items-center">
-          <Text className="text-xs font-semibold text-foreground">{youLabel}</Text>
-          {primaryPending ? (
-            <View className="mt-1 h-3 w-20 rounded bg-accent" />
-          ) : (
-            <Text variant="muted" className="text-[11px]">
-              {primaryRank} · {primaryXp} XP
-            </Text>
-          )}
-        </View>
-        <View className="items-center">
-          <Text className="text-xs font-semibold text-foreground" numberOfLines={1}>
-            {themLabel}
-          </Text>
-          <Text variant="muted" className="text-[11px]">
-            {compareRank} · {compareXp} XP
-          </Text>
-        </View>
-      </View>
-
-      {active ? (
-        <Text variant="muted" className="mt-2 text-center text-[11px]">
-          {active.label} · {active.rank} · {active.xp} XP
-        </Text>
-      ) : null}
     </View>
   )
 }

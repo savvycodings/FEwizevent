@@ -58,24 +58,13 @@ type EarnedBadge = {
   awardedAt: string
 }
 
-const RANK_ORDER = ['Bronze', 'Silver', 'Gold', 'Platinum', 'Diamond', 'Champion'] as const
-type RankTier = (typeof RANK_ORDER)[number]
-const RANK_MIN_XP: Record<RankTier, number> = {
-  Bronze: 0,
-  Silver: 100,
-  Gold: 300,
-  Platinum: 650,
-  Diamond: 1200,
-  Champion: 2000,
-}
-const RANK_BADGE: Record<RankTier, any> = {
-  Bronze: require('../../assets/ranked/bronze.png'),
-  Silver: require('../../assets/ranked/silver.png'),
-  Gold: require('../../assets/ranked/gold.png'),
-  Platinum: require('../../assets/ranked/platnuim.png'),
-  Diamond: require('../../assets/ranked/diomand.png'),
-  Champion: require('../../assets/ranked/champion.png'),
-}
+import {
+  RANK_BADGE_ASSET,
+  RANK_MIN_XP,
+  RANK_ORDER,
+  type RankTier,
+} from '../data/rankSystem'
+const RANK_BADGE = RANK_BADGE_ASSET
 
 function formatEventDateLabel(eventDate: string | null): string {
   if (!eventDate) return 'Date TBA'

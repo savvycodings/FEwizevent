@@ -193,14 +193,6 @@ export function SeasonLeaderboard({
         </View>
       ) : null}
 
-      {payload ? (
-        <Text style={styles.seasonNote}>
-          {mode === 'combined'
-            ? `Season ${payload.seasonYear} — all players`
-            : `${HOME_STORE_LABEL[store]} team · Season ${payload.seasonYear}`}
-        </Text>
-      ) : null}
-
       {mode === 'store-teams' && (payload?.challengeLeader || payload?.cupChampion) ? (
         <View style={styles.crownRow}>
           {payload.challengeLeader ? (
@@ -343,12 +335,6 @@ const getStyles = (theme: any) =>
     },
     storeTabTextInactive: {
       color: theme.textColor,
-    },
-    seasonNote: {
-      color: theme.mutedForegroundColor,
-      fontFamily: theme.regularFont,
-      fontSize: TYPOGRAPHY.caption,
-      marginBottom: SPACING.sm,
     },
     crownRow: {
       flexDirection: 'row',

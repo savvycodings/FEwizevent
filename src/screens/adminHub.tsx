@@ -8,6 +8,7 @@ import { RADIUS, SPACING, TYPOGRAPHY } from '../constants/layout'
 const ACTIONS = [
   { route: 'AdminCreate', icon: 'calendar' as const, title: 'Create events' },
   { route: 'AdminAttendance', icon: 'list-checks' as const, title: 'Manage events' },
+  { route: 'AdminLeagueConfig', icon: 'shield' as const, title: 'League config' },
   { route: 'AdminRedeem', icon: 'award' as const, title: 'Redeem prizes' },
   { route: 'PlayerInfo', icon: 'users' as const, title: 'Player info' },
   { route: 'RankingLeaderboard', icon: 'trophy' as const, title: 'Ranked leaderboard' },

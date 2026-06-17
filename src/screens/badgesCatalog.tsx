@@ -3,24 +3,25 @@ import { ScrollView, StyleSheet, Text, View } from 'react-native'
 import { useFocusEffect } from '@react-navigation/native'
 import { AppContext, ThemeContext } from '../context'
 import { BadgeVectorIcon, ThemedCard } from '../components'
-import {
-  BADGE_AWARD_TEXT,
-  BADGE_CATALOG_ORDER,
-  BADGE_DISPLAY_TITLE,
-  type BadgeId,
-} from '../data/badgesCatalog'
+import { BADGE_CATALOG_ORDER, BADGE_DISPLAY_TITLE, type BadgeId } from '../data/badgesCatalog'
 import { RADIUS, SPACING, TYPOGRAPHY } from '../constants/layout'
 import { apiRequest } from '../api'
 
-type EarnedBadge = {
-  badgeId: BadgeId
+type BadgeDef = {
+  id: string
+  title: string
+  description: string
+  xpReward: number
 }
+
+type EarnedBadge = { badgeId: BadgeId }
 
 export function BadgesCatalog() {
   const { theme } = useContext(ThemeContext)
   const { currentUser } = useContext(AppContext)
   const styles = getStyles(theme)
   const [earnedIds, setEarnedIds] = useState<Set<BadgeId>>(new Set())
+  const [definitions, setDefinitions] = useState<BadgeDef[]>([])
 
   const loadEarned = useCallback(async () => {
     if (!currentUser?.id) {
@@ -39,21 +40,44 @@ export function BadgesCatalog() {
     }
   }, [currentUser?.id])
 
+  const loadDefinitions = useCallback(async () => {
+    try {
+      const res = await apiRequest<{ badges?: BadgeDef[] }>('/auth/league/active-season')
+      const list = Array.isArray(res.badges) ? res.badges : []
+      if (list.length > 0) {
+        setDefinitions(list)
+        return
+      }
+    } catch {
+      /* fallback below */
+    }
+    setDefinitions(
+      BADGE_CATALOG_ORDER.map((id) => ({
+        id,
+        title: BADGE_DISPLAY_TITLE[id],
+        description: '',
+        xpReward: 0,
+      }))
+    )
+  }, [])
+
   useFocusEffect(
     useCallback(() => {
       loadEarned()
-    }, [loadEarned])
+      loadDefinitions()
+    }, [loadEarned, loadDefinitions])
   )
 
   const rows = useMemo(
     () =>
-      BADGE_CATALOG_ORDER.map((id) => ({
-        id,
-        title: BADGE_DISPLAY_TITLE[id],
-        blurb: BADGE_AWARD_TEXT[id],
-        earned: earnedIds.has(id),
+      definitions.map((def) => ({
+        id: def.id as BadgeId,
+        title: def.title,
+        blurb: def.description,
+        xpReward: def.xpReward,
+        earned: earnedIds.has(def.id as BadgeId),
       })),
-    [earnedIds]
+    [definitions, earnedIds]
   )
 
   return (
@@ -64,6 +88,9 @@ export function BadgesCatalog() {
             <View style={styles.rowLeft}>
               <Text style={styles.title}>{row.title}</Text>
               <Text style={styles.subtitle}>{row.blurb}</Text>
+              {row.xpReward > 0 ? (
+                <Text style={styles.xpNote}>+{row.xpReward} XP (one-time)</Text>
+              ) : null}
             </View>
             <View style={styles.iconWrap}>
               <BadgeVectorIcon
@@ -118,6 +145,12 @@ const getStyles = (theme: any) =>
       fontFamily: theme.regularFont,
       fontSize: TYPOGRAPHY.caption,
       lineHeight: Math.round(TYPOGRAPHY.caption * 1.45),
+    },
+    xpNote: {
+      marginTop: SPACING.xs,
+      color: theme.tintColor,
+      fontFamily: theme.semiBoldFont,
+      fontSize: TYPOGRAPHY.caption,
     },
     iconWrap: {
       width: 44,

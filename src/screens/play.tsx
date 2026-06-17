@@ -103,7 +103,7 @@ export function Play() {
         <View style={styles.profileBlock}>
           <Text style={styles.profileName}>{currentUser?.name || 'Trainer'}</Text>
           {homeStoreName ? (
-            <Text style={styles.profileMeta}>Home store · {homeStoreName}</Text>
+            <Text style={styles.profileMeta}>{homeStoreName}</Text>
           ) : !currentUser?.id ? (
             <Text style={styles.profileMeta}>Sign in to sync attendance and season XP.</Text>
           ) : null}
@@ -112,14 +112,12 @@ export function Play() {
               <DeckLabel
                 deckId={activeDeckId}
                 label={activeDeckLabel}
-                prefix="Profile deck"
                 iconSize={22}
+                iconPosition="right"
                 textStyle={styles.deckMeta}
               />
             ) : (
-              <Text style={styles.deckMeta}>
-                Profile deck · Not selected — set on Profile
-              </Text>
+              <Text style={styles.deckMeta}>Not selected — set on Profile</Text>
             )
           ) : null}
         </View>

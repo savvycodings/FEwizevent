@@ -105,6 +105,24 @@ function tierLabel(tier: string | null | undefined): string {
   return `${EVENT_TIER_LABEL.casual} (${formatTierMultiplier('casual')})`
 }
 
+function draftsFromPlacements(rows: PlacementRow[]): Record<number, string> {
+  const out: Record<number, string> = {}
+  for (const row of rows) {
+    out[row.userId] =
+      row.placement != null && row.placement >= 1 ? String(row.placement) : ''
+  }
+  return out
+}
+
+function applyPlacements(
+  rows: PlacementRow[],
+  setPlacements: (rows: PlacementRow[]) => void,
+  setPlacementDrafts: (drafts: Record<number, string>) => void
+) {
+  setPlacements(rows)
+  setPlacementDrafts(draftsFromPlacements(rows))
+}
+
 export function AdminEventManage({ navigation }: { navigation: any }) {
   const { theme } = useContext(ThemeContext)
   const styles = getStyles(theme)
@@ -114,6 +132,8 @@ export function AdminEventManage({ navigation }: { navigation: any }) {
 
   const [tab, setTab] = useState<ManageTab>('players')
   const [placements, setPlacements] = useState<PlacementRow[]>([])
+  const [placementDrafts, setPlacementDrafts] = useState<Record<number, string>>({})
+  const [pendingKeys, setPendingKeys] = useState<Record<string, boolean>>({})
   const [searchQuery, setSearchQuery] = useState('')
   const [judgedAwards, setJudgedAwards] = useState<JudgedAwardRow[]>([])
   const [judgedBonusXp, setJudgedBonusXp] = useState(50)
@@ -160,9 +180,27 @@ export function AdminEventManage({ navigation }: { navigation: any }) {
   }, [placements])
 
   const selectedUser = useMemo(
-    () => placements.find((p) => p.userId === selectedUserId) ?? null,
-    [placements, selectedUserId]
+    () => attendedPlayers.find((p) => p.userId === selectedUserId) ?? null,
+    [attendedPlayers, selectedUserId]
   )
+
+  const setPending = useCallback((key: string, on: boolean) => {
+    setPendingKeys((prev) => {
+      if (!on) {
+        if (!prev[key]) return prev
+        const next = { ...prev }
+        delete next[key]
+        return next
+      }
+      return { ...prev, [key]: true }
+    })
+  }, [])
+
+  const patchPlacementRow = useCallback((userId: number, patch: Partial<PlacementRow>) => {
+    setPlacements((prev) =>
+      prev.map((p) => (p.userId === userId ? { ...p, ...patch } : p))
+    )
+  }, [])
 
   const load = useCallback(async () => {
     if (!eventId) return
@@ -175,7 +213,8 @@ export function AdminEventManage({ navigation }: { navigation: any }) {
         `/admin/events/${eventId}/settings`
       ).catch(() => ({ event: {} })),
     ])
-    setPlacements(Array.isArray(boardRes.placements) ? boardRes.placements : [])
+    const rows = Array.isArray(boardRes.placements) ? boardRes.placements : []
+    applyPlacements(rows, setPlacements, setPlacementDrafts)
     setJudgedAwards(Array.isArray(awardsRes.awards) ? awardsRes.awards : [])
     setJudgedBonusXp(awardsRes.bonusXp ?? 50)
     const ev = settingsRes.event
@@ -205,19 +244,49 @@ export function AdminEventManage({ navigation }: { navigation: any }) {
   )
 
   async function setAttended(userId: number, attended: boolean) {
-    await apiRequest('/admin/attendance', {
-      method: 'POST',
-      body: JSON.stringify({ userId, eventId, attended }),
-    })
-    await load()
+    const prev = placements.find((p) => p.userId === userId)
+    if (!prev) return
+    const key = `attend:${userId}`
+    patchPlacementRow(userId, { attended })
+    setPending(key, true)
+    try {
+      const res = await apiRequest<{
+        deckId?: string | null
+        placement?: number | null
+      }>('/admin/attendance', {
+        method: 'POST',
+        body: JSON.stringify({ userId, eventId, attended }),
+      })
+      patchPlacementRow(userId, {
+        attended,
+        deckId: res.deckId ?? prev.deckId,
+        placement: res.placement ?? prev.placement,
+      })
+    } catch (err: unknown) {
+      patchPlacementRow(userId, { attended: prev.attended })
+      Alert.alert('Update failed', err instanceof Error ? err.message : 'Try again')
+    } finally {
+      setPending(key, false)
+    }
   }
 
   async function setDeck(userId: number, deckId: string) {
-    await apiRequest('/admin/attendance-deck', {
-      method: 'POST',
-      body: JSON.stringify({ userId, eventId, deckId }),
-    })
-    await load()
+    const prev = placements.find((p) => p.userId === userId)
+    if (!prev || prev.deckId === deckId) return
+    const key = `deck:${userId}`
+    patchPlacementRow(userId, { deckId })
+    setPending(key, true)
+    try {
+      await apiRequest('/admin/attendance-deck', {
+        method: 'POST',
+        body: JSON.stringify({ userId, eventId, deckId }),
+      })
+    } catch (err: unknown) {
+      patchPlacementRow(userId, { deckId: prev.deckId })
+      Alert.alert('Deck failed', err instanceof Error ? err.message : 'Try again')
+    } finally {
+      setPending(key, false)
+    }
   }
 
   async function setPlacementFromInput(userId: number, raw: string) {
@@ -225,13 +294,43 @@ export function AdminEventManage({ navigation }: { navigation: any }) {
     const next = trimmed === '' ? null : Math.floor(Number(trimmed))
     if (trimmed !== '' && (!Number.isFinite(next) || (next as number) < 1)) {
       Alert.alert('Invalid place', 'Enter a whole number (1 or higher), or leave empty.')
+      const row = placements.find((p) => p.userId === userId)
+      setPlacementDrafts((d) => ({
+        ...d,
+        [userId]:
+          row?.placement != null && row.placement >= 1 ? String(row.placement) : '',
+      }))
       return
     }
-    await apiRequest('/admin/attendance-placement', {
-      method: 'POST',
-      body: JSON.stringify({ userId, eventId, placement: next }),
-    })
-    await load()
+    const prev = placements.find((p) => p.userId === userId)
+    const prevPlace = prev?.placement ?? null
+    if (prevPlace === next) return
+
+    const key = `place:${userId}`
+    patchPlacementRow(userId, { placement: next, attended: true })
+    setPending(key, true)
+    try {
+      const res = await apiRequest<{ placements?: PlacementRow[] }>(
+        '/admin/attendance-placement',
+        {
+          method: 'POST',
+          body: JSON.stringify({ userId, eventId, placement: next }),
+        }
+      )
+      if (Array.isArray(res.placements)) {
+        applyPlacements(res.placements, setPlacements, setPlacementDrafts)
+      }
+    } catch (err: unknown) {
+      patchPlacementRow(userId, { placement: prevPlace })
+      setPlacementDrafts((d) => ({
+        ...d,
+        [userId]:
+          prevPlace != null && prevPlace >= 1 ? String(prevPlace) : '',
+      }))
+      Alert.alert('Placement failed', err instanceof Error ? err.message : 'Try again')
+    } finally {
+      setPending(key, false)
+    }
   }
 
   async function setJudgedWinner(awardType: JudgedAwardType, userId: number | null) {
@@ -387,6 +486,13 @@ export function AdminEventManage({ navigation }: { navigation: any }) {
           accessibilityLabelPrefix="Open"
         />
 
+        <Pressable
+          style={styles.checkInLink}
+          onPress={() => navigation.navigate('AdminEventCheckIn', { eventId })}
+        >
+          <Text style={styles.checkInLinkText}>Check-in view (rank · entitlement · season XP)</Text>
+        </Pressable>
+
         {tab === 'players' ? (
           <>
             <SearchField
@@ -396,9 +502,9 @@ export function AdminEventManage({ navigation }: { navigation: any }) {
               containerClassName="mb-3 rounded-lg border border-border bg-card px-3"
             />
             {filteredPlacements.map((row) => {
-              const placeNum =
-                row.placement == null || row.placement < 1 ? null : Number(row.placement)
-              const key = `${row.userId}:${eventId}`
+              const attendPending = !!pendingKeys[`attend:${row.userId}`]
+              const placePending = !!pendingKeys[`place:${row.userId}`]
+              const deckPending = !!pendingKeys[`deck:${row.userId}`]
               return (
                 <View key={row.userId} style={styles.playerRow}>
                   <Pressable
@@ -420,23 +526,31 @@ export function AdminEventManage({ navigation }: { navigation: any }) {
                       compact
                       showFieldLabel={false}
                       value={row.deckId ?? null}
+                      disabled={deckPending}
                       onChange={(id) => setDeck(row.userId, id)}
                     />
                     <Input
-                      key={`place-${key}-${placeNum ?? 'x'}`}
-                      defaultValue={placeNum == null ? '' : String(placeNum)}
+                      value={placementDrafts[row.userId] ?? ''}
+                      onChangeText={(text) =>
+                        setPlacementDrafts((d) => ({ ...d, [row.userId]: text }))
+                      }
                       onEndEditing={(e) =>
                         setPlacementFromInput(row.userId, e.nativeEvent.text)
                       }
+                      onSubmitEditing={(e) =>
+                        setPlacementFromInput(row.userId, e.nativeEvent.text)
+                      }
+                      editable={!placePending}
                       keyboardType="number-pad"
                       placeholder="#"
                       returnKeyType="done"
                       className="mb-0 h-11 w-14 min-w-[56px] px-2 text-center"
                     />
                     <ThemedButton
-                      label={row.attended ? '✓' : 'Mark'}
+                      label={attendPending ? '…' : row.attended ? '✓' : 'Mark'}
                       variant={row.attended ? 'primary' : 'outline'}
                       style={styles.attendBtn}
+                      disabled={attendPending}
                       onPress={() => setAttended(row.userId, !row.attended)}
                     />
                   </View>
@@ -534,8 +648,11 @@ export function AdminEventManage({ navigation }: { navigation: any }) {
             })}
 
             <Text style={styles.manualBadgesHeading}>Manual badges</Text>
+            {attendedPlayers.length === 0 ? (
+              <Text style={styles.muted}>Mark players attended first.</Text>
+            ) : (
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.userChips}>
-              {placements.map((p) => (
+              {attendedPlayers.map((p) => (
                 <Pressable
                   key={p.userId}
                   onPress={() => setSelectedUserId(p.userId)}
@@ -556,6 +673,7 @@ export function AdminEventManage({ navigation }: { navigation: any }) {
                 </Pressable>
               ))}
             </ScrollView>
+            )}
             {selectedUser ? (
               <ThemedCard style={styles.badgesCard}>
                 <Text style={styles.badgeFor}>
@@ -712,7 +830,21 @@ const getStyles = (theme: any) =>
       fontSize: TYPOGRAPHY.bodySmall,
     },
     tabPillsRow: {
+      marginBottom: SPACING.sm,
+    },
+    checkInLink: {
       marginBottom: SPACING.md,
+      paddingVertical: SPACING.sm,
+      paddingHorizontal: SPACING.md,
+      borderRadius: RADIUS.md,
+      borderWidth: 1,
+      borderColor: theme.tintColor,
+      alignItems: 'center',
+    },
+    checkInLinkText: {
+      color: theme.tintColor,
+      fontFamily: theme.semiBoldFont,
+      fontSize: TYPOGRAPHY.caption,
     },
     sectionHint: {
       color: theme.mutedForegroundColor,

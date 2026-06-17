@@ -24,6 +24,9 @@ export { BadgesCatalog } from './badgesCatalog'
 export { AttendedEvents } from './attendedEvents'
 export { PlayerSearch } from './playerSearch'
 export { SeasonLeaderboardScreen } from './seasonLeaderboard'
+export { RankSystemGuide } from './rankSystemGuide'
+export { AdminLeagueConfig } from './adminLeagueConfig'
+export { AdminEventCheckIn } from './adminEventCheckIn'
 
 // Legacy screen exports are intentionally kept for future re-enable.
 export { Chat as LegacyChat } from './chat'

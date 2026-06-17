@@ -10,6 +10,8 @@ interface SectionProps {
   title: string
   subtitle?: string
   onPressSeeAll?: () => void
+  /** Trailing control on the title row (e.g. help button). Shown when `onPressSeeAll` is not set. */
+  headerTrailing?: ReactNode
   children: ReactNode
   compactTopSpacing?: boolean
   /** When false, no rule under the header (e.g. tight stacks). Default true. */
@@ -24,6 +26,7 @@ export function Section({
   title,
   subtitle,
   onPressSeeAll,
+  headerTrailing,
   children,
   compactTopSpacing = false,
   showDivider = true,
@@ -38,7 +41,7 @@ export function Section({
       )}
     >
       <View className="mb-3">
-        <ToolbarRow style={{ alignItems: 'flex-start' }}>
+        <ToolbarRow>
           <Text
             variant={largeTitle ? 'h3' : 'h4'}
             style={rowGrow.text}
@@ -53,6 +56,8 @@ export function Section({
                 View All
               </Text>
             </TouchableOpacity>
+          ) : headerTrailing ? (
+            <View style={rowGrow.end}>{headerTrailing}</View>
           ) : null}
         </ToolbarRow>
         {subtitle ? (

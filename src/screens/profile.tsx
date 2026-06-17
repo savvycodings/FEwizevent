@@ -30,6 +30,7 @@ import { RADIUS, SPACING, TYPOGRAPHY } from '../constants/layout'
 import { apiRequest, apiUrl } from '../api'
 import { fetchAndCachePlayerStats } from '../state/fetchPlayerStats'
 import { getCachedPlayerStats, setCachedPlayerStats } from '../state/playerStatsCache'
+import { RANK_BADGE_ASSET } from '../data/rankSystem'
 
 type RankProgressSeries = {
   userId: number
@@ -44,6 +45,7 @@ type RankProgressResponse = {
   chartScope?: 'month' | 'all-time'
   primary: RankProgressSeries
   compare: RankProgressSeries | null
+  season?: { xp: number; rank: string; name: string }
   lifetime?: { xp: number; rank: string; name: string }
   summary: {
     rankStart: string
@@ -61,14 +63,7 @@ type PlayerPick = {
   profileImageUrl?: string | null
 }
 
-const RANK_BADGE: Record<string, number> = {
-  Bronze: require('../../assets/ranked/bronze.png'),
-  Silver: require('../../assets/ranked/silver.png'),
-  Gold: require('../../assets/ranked/gold.png'),
-  Platinum: require('../../assets/ranked/platnuim.png'),
-  Diamond: require('../../assets/ranked/diomand.png'),
-  Champion: require('../../assets/ranked/champion.png'),
-}
+const RANK_BADGE = RANK_BADGE_ASSET
 
 const COMPARE_PLAYER_SAMPLE = 10
 
@@ -94,7 +89,7 @@ export function Profile() {
 
   const [comparePlayer, setComparePlayer] = useState<PlayerPick | null>(null)
   const [compareTotals, setCompareTotals] = useState<CompareXpTotals | null>(null)
-  const [lifetimeXp, setLifetimeXp] = useState<{ xp: number; rank: string } | null>(null)
+  const [seasonStats, setSeasonStats] = useState<{ xp: number; rank: string } | null>(null)
   const [compareModal, setCompareModal] = useState(false)
   const [playerQuery, setPlayerQuery] = useState('')
   const [playerHits, setPlayerHits] = useState<PlayerPick[]>([])
@@ -156,16 +151,16 @@ export function Profile() {
     }
   }, [comparePlayer?.id, currentUser?.id, currentUser?.name, compareTotals?.primaryLoading])
 
-  const refreshLifetime = useCallback(async () => {
+  const refreshSeasonStats = useCallback(async () => {
     if (!currentUser?.id) return
     try {
       const stats = await fetchAndCachePlayerStats(currentUser.id, currentUser.name, {
         force: true,
       })
-      setLifetimeXp({ xp: stats.xp, rank: stats.rank })
+      setSeasonStats({ xp: stats.xp, rank: stats.rank })
     } catch {
       const cached = getCachedPlayerStats(currentUser.id)
-      if (cached) setLifetimeXp({ xp: cached.xp, rank: cached.rank })
+      if (cached) setSeasonStats({ xp: cached.xp, rank: cached.rank })
     }
   }, [currentUser?.id, currentUser?.name])
 
@@ -182,9 +177,10 @@ export function Profile() {
       const path = `/auth/rank-progress?userId=${currentUser.id}`
       const url = apiUrl(path)
       const res = await apiRequest<RankProgressResponse>(path)
-      if (res.lifetime) {
-        const { xp, rank, name } = res.lifetime
-        setLifetimeXp({ xp, rank })
+      const seasonRow = res.season ?? res.lifetime
+      if (seasonRow) {
+        const { xp, rank, name } = seasonRow
+        setSeasonStats({ xp, rank })
         setCachedPlayerStats(currentUser.id, { xp, rank, name })
       }
       if (__DEV__) {
@@ -192,7 +188,7 @@ export function Profile() {
           url,
           points: res.primary?.points?.length ?? 0,
           events: res.summary?.events,
-          lifetimeXp: res.lifetime?.xp,
+          seasonXp: seasonRow?.xp,
         })
       }
       setData({ ...res, compare: null })
@@ -214,9 +210,9 @@ export function Profile() {
 
   useFocusEffect(
     useCallback(() => {
-      refreshLifetime()
+      refreshSeasonStats()
       loadProgress()
-    }, [refreshLifetime, loadProgress])
+    }, [refreshSeasonStats, loadProgress])
   )
 
   const searchPlayers = useCallback(async (q: string) => {
@@ -271,9 +267,9 @@ export function Profile() {
 
   const cached = currentUser?.id ? getCachedPlayerStats(currentUser.id) : null
   const displayRank =
-    lifetimeXp?.rank ?? data?.lifetime?.rank ?? cached?.rank ?? data?.summary.rankEnd ?? 'Bronze'
+    seasonStats?.rank ?? data?.season?.rank ?? cached?.rank ?? data?.summary.rankEnd ?? 'Bronze'
   const displayXp =
-    lifetimeXp?.xp ?? data?.lifetime?.xp ?? cached?.xp ?? 0
+    seasonStats?.xp ?? data?.season?.xp ?? cached?.xp ?? 0
   const monthXpGained = data?.summary.xpGained ?? 0
   const rankBadge = RANK_BADGE[displayRank] ?? RANK_BADGE.Bronze
   const summarySubtitle =
@@ -281,7 +277,7 @@ export function Profile() {
       ? `+${monthXpGained} XP this month`
       : data?.summary.rankStart !== data?.summary.rankEnd
         ? `Up from ${data?.summary.rankStart} this month`
-        : 'Lifetime rank from events'
+        : 'Season rank'
 
   return (
     <View style={styles.screen}>
@@ -304,7 +300,7 @@ export function Profile() {
                 title={displayRank}
                 subtitle={summarySubtitle}
                 trailingValue={String(displayXp)}
-                trailingLabel="XP"
+                trailingLabel="Season XP"
               />
             </ThemedCard>
 

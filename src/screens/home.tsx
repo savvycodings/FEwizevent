@@ -38,6 +38,12 @@ import { setCachedPlayerStats } from '../state/playerStatsCache'
 import QRCode from 'react-native-qrcode-svg'
 import { getPlayerProfileDeepLink } from '../utils/playerProfileLink'
 import { formatRankProgressFooter, xpRemainingToRank } from '../utils/rankProgressHint'
+import {
+  RANK_BADGE_ASSET,
+  RANK_MIN_XP,
+  RANK_ORDER,
+  type RankTier,
+} from '../data/rankSystem'
 
 const QR_MODAL_SIZE = 256
 const HOME_BADGE_COLUMNS = 4
@@ -59,7 +65,8 @@ type HomeFeedItem = {
 
 type RankSummary = {
   xp: number
-  rank: 'Bronze' | 'Silver' | 'Gold' | 'Platinum' | 'Diamond' | 'Champion'
+  rank: RankTier
+  seasonXp: number
 }
 type EarnedBadge = {
   badgeId: BadgeId
@@ -67,24 +74,6 @@ type EarnedBadge = {
   eventId: number | null
   eventTitle: string | null
   awardedAt: string
-}
-
-const RANK_ORDER = ['Bronze', 'Silver', 'Gold', 'Platinum', 'Diamond', 'Champion'] as const
-const RANK_MIN_XP: Record<RankSummary['rank'], number> = {
-  Bronze: 0,
-  Silver: 100,
-  Gold: 300,
-  Platinum: 650,
-  Diamond: 1200,
-  Champion: 2000,
-}
-const RANK_BADGE: Record<RankSummary['rank'], any> = {
-  Bronze: require('../../assets/ranked/bronze.png'),
-  Silver: require('../../assets/ranked/silver.png'),
-  Gold: require('../../assets/ranked/gold.png'),
-  Platinum: require('../../assets/ranked/platnuim.png'),
-  Diamond: require('../../assets/ranked/diomand.png'),
-  Champion: require('../../assets/ranked/champion.png'),
 }
 
 function ordinalPlacement(n: number): string {
@@ -126,6 +115,9 @@ export function Home({ navigation }: HomeProps) {
   const openAttendedEvents = useCallback(() => {
     navigation.navigate('AttendedEvents')
   }, [navigation])
+  const openRankGuide = useCallback(() => {
+    navigation.navigate('RankSystemGuide')
+  }, [navigation])
   const openEventPage = useCallback(
     (item: HomeFeedItem) => {
       const eventId = Number(item.eventId)
@@ -161,9 +153,12 @@ export function Home({ navigation }: HomeProps) {
     try {
       setHomeLoading(true)
       const [homeRes, rankRes, deckRes] = await Promise.all([
-        apiRequest<{ weekStreak: number; gamesPlayed?: number; feed: HomeFeedItem[] }>(
-          `/auth/home-summary?userId=${currentUser.id}`
-        ),
+        apiRequest<{
+          weekStreak: number
+          gamesPlayed?: number
+          feed: HomeFeedItem[]
+          season?: { seasonXp: number; rank: RankTier; entitlementTier: RankTier; lifetimeXp: number } | null
+        }>(`/auth/home-summary?userId=${currentUser.id}`),
         apiRequest<{ user: { xp?: number; rank?: RankSummary['rank'] }; badges?: EarnedBadge[] }>(
           `/admin/users/${currentUser.id}/details`
         ),
@@ -174,9 +169,10 @@ export function Home({ navigation }: HomeProps) {
       setWeekStreak(homeRes.weekStreak ?? 0)
       setGamesPlayed(Number(homeRes.gamesPlayed ?? 0))
       setFeed(Array.isArray(homeRes.feed) ? homeRes.feed : [])
-      const xp = Number(rankRes.user?.xp ?? 0)
-      const rank = (rankRes.user?.rank as RankSummary['rank']) || 'Bronze'
-      setRankSummary({ xp, rank })
+      const season = homeRes.season
+      const xp = Number(season?.seasonXp ?? rankRes.user?.xp ?? 0)
+      const rank = (season?.rank ?? rankRes.user?.rank as RankSummary['rank']) || 'Bronze'
+      setRankSummary({ xp, rank, seasonXp: xp })
       setCachedPlayerStats(currentUser.id, {
         xp,
         rank,
@@ -188,7 +184,7 @@ export function Home({ navigation }: HomeProps) {
       setWeekStreak(0)
       setGamesPlayed(0)
       setFeed([])
-      setRankSummary({ xp: 0, rank: 'Bronze' })
+      setRankSummary({ xp: 0, rank: 'Bronze', seasonXp: 0 })
       setEarnedBadges([])
       setActiveDeckId(null)
     } finally {
@@ -339,7 +335,7 @@ export function Home({ navigation }: HomeProps) {
               <View style={styles.heroPills}>
                 <View style={styles.rankPill}>
                   <Image
-                    source={RANK_BADGE[currentRank]}
+                    source={RANK_BADGE_ASSET[currentRank]}
                     style={styles.rankPillIcon}
                     resizeMode="contain"
                   />
@@ -400,10 +396,24 @@ export function Home({ navigation }: HomeProps) {
           <CommunityDeckMetaSection />
         </Section>
 
-        <Section title="Rank progress" compactTopSpacing>
+        <Section
+          title="Rank progress"
+          compactTopSpacing
+          headerTrailing={
+            <Pressable
+              onPress={openRankGuide}
+              hitSlop={8}
+              style={({ pressed }) => [styles.rankHelpButton, pressed && styles.rankHelpButtonPressed]}
+              accessibilityRole="button"
+              accessibilityLabel="How the rank system works"
+            >
+              <Text style={styles.rankHelpButtonText}>?</Text>
+            </Pressable>
+          }
+        >
           <RankProgressCard
             premiumRim
-            badgeSource={RANK_BADGE[currentRank]}
+            badgeSource={RANK_BADGE_ASSET[currentRank]}
             tierLabel={`${currentRank} tier`}
             xpLabel={
               nextRank
@@ -715,6 +725,25 @@ const getStyles = (theme: any) =>
       color: BRAND.heroInk,
       fontFamily: theme.semiBoldFont,
       fontSize: TYPOGRAPHY.caption,
+    },
+    rankHelpButton: {
+      width: 28,
+      height: 28,
+      borderRadius: RADIUS.full,
+      borderWidth: 1,
+      borderColor: theme.borderColor,
+      backgroundColor: theme.cardBackground,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    rankHelpButtonPressed: {
+      opacity: 0.72,
+    },
+    rankHelpButtonText: {
+      color: theme.mutedForegroundColor,
+      fontFamily: theme.boldFont,
+      fontSize: TYPOGRAPHY.bodySmall,
+      lineHeight: TYPOGRAPHY.bodySmall,
     },
     statsRow: {
       flexDirection: 'row',

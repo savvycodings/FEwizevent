@@ -29,6 +29,9 @@ import {
   AttendedEvents,
   PlayerSearch,
   SeasonLeaderboardScreen,
+  RankSystemGuide,
+  AdminLeagueConfig,
+  AdminEventCheckIn,
 } from './screens'
 import { AppIcon } from './components/ui/app-icon'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -174,6 +177,18 @@ function Tabs() {
         }}
       />
       <Tab.Screen
+        name="RankSystemGuide"
+        component={RankSystemGuide}
+        options={{
+          headerShown: true,
+          header: ({ navigation }) => (
+            <TopHeader showBack onBack={() => navigation.goBack()} />
+          ),
+          tabBarButton: () => null,
+          tabBarItemStyle: { display: 'none' },
+        }}
+      />
+      <Tab.Screen
         name="AttendedEvents"
         component={AttendedEvents}
         options={{
@@ -203,11 +218,7 @@ function Tabs() {
         options={{
           headerShown: true,
           header: ({ navigation }) => (
-            <TopHeader
-              title="Season ladder"
-              showBack
-              onBack={() => navigation.navigate('PlayTab')}
-            />
+            <TopHeader showBack onBack={() => navigation.navigate('PlayTab')} />
           ),
           tabBarButton: () => null,
           tabBarItemStyle: { display: 'none' },
@@ -258,6 +269,30 @@ function Tabs() {
           headerShown: true,
           header: ({ navigation }) => (
             <TopHeader title="Redeem prizes" showBack onBack={() => navigation.navigate('Admin')} />
+          ),
+          tabBarButton: () => null,
+          tabBarItemStyle: { display: 'none' },
+        }}
+      />
+      <Tab.Screen
+        name="AdminLeagueConfig"
+        component={AdminLeagueConfig}
+        options={{
+          headerShown: true,
+          header: ({ navigation }) => (
+            <TopHeader title="League config" showBack onBack={() => navigation.navigate('Admin')} />
+          ),
+          tabBarButton: () => null,
+          tabBarItemStyle: { display: 'none' },
+        }}
+      />
+      <Tab.Screen
+        name="AdminEventCheckIn"
+        component={AdminEventCheckIn}
+        options={{
+          headerShown: true,
+          header: ({ navigation }) => (
+            <TopHeader title="Event check-in" showBack onBack={() => navigation.goBack()} />
           ),
           tabBarButton: () => null,
           tabBarItemStyle: { display: 'none' },

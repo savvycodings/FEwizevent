@@ -52,11 +52,11 @@ export function RanksBadgesModal({
   const { theme } = useContext(ThemeContext)
   const { height: windowHeight } = useWindowDimensions()
   const styles = getStyles(theme)
-  const currentEntitlement = entitlementTierForXp(currentXp)
-
   const [entitlements, setEntitlements] = useState<RankEntitlementItem[]>([])
   const [loadingEntitlements, setLoadingEntitlements] = useState(false)
   const [claimingTier, setClaimingTier] = useState<EntitlementTier | null>(null)
+  const [currentTier, setCurrentTier] = useState<EntitlementTier>('Bronze')
+  const currentEntitlement = currentTier
 
   const entitlementByTier = useMemo(() => {
     const map = new Map<EntitlementTier, RankEntitlementItem>()
@@ -71,10 +71,14 @@ export function RanksBadgesModal({
     }
     try {
       setLoadingEntitlements(true)
-      const res = await apiRequest<{ entitlements: RankEntitlementItem[] }>(
-        `/auth/rank-entitlements?userId=${userId}`
-      )
+      const res = await apiRequest<{
+        entitlements: RankEntitlementItem[]
+        currentTier?: EntitlementTier
+      }>(`/auth/rank-entitlements?userId=${userId}`)
       setEntitlements(res.entitlements ?? [])
+      if (res.currentTier && ENTITLEMENT_TIER_ORDER.includes(res.currentTier)) {
+        setCurrentTier(res.currentTier)
+      }
     } catch {
       setEntitlements([])
     } finally {
@@ -92,11 +96,11 @@ export function RanksBadgesModal({
         const server = entitlementByTier.get(tier)
         return {
           tier,
-          minXp: ENTITLEMENT_MIN_XP[tier],
-          reward: RANK_ENTITLEMENT_REWARD[tier],
+          minXp: server?.minXp ?? ENTITLEMENT_MIN_XP[tier],
+          reward: server?.reward ?? RANK_ENTITLEMENT_REWARD[tier],
           active: tier === currentEntitlement,
-          reached: currentXp >= ENTITLEMENT_MIN_XP[tier],
-          status: server?.status ?? (currentXp >= ENTITLEMENT_MIN_XP[tier] ? 'claimable' : 'locked'),
+          reached: server?.status !== 'locked',
+          status: server?.status ?? 'locked',
           claimCode: server?.claimCode ?? null,
         }
       }),

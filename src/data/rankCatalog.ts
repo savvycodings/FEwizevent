@@ -1,26 +1,10 @@
-/** Prize entitlement tiers shown in the ranks & rewards catalog (same entry fee for all). */
-export const ENTITLEMENT_TIER_ORDER = [
-  'Bronze',
-  'Silver',
-  'Gold',
-  'Platinum',
-  'Diamond',
-  'Master',
-  'Champion',
-] as const
+import { RANK_ORDER, RANK_MIN_XP, type RankTier } from './rankSystem'
 
-export type EntitlementTier = (typeof ENTITLEMENT_TIER_ORDER)[number]
+/** Prize entitlement tiers — synced with server rank ladder */
+export const ENTITLEMENT_TIER_ORDER = RANK_ORDER
+export type EntitlementTier = RankTier
 
-/** Minimum lifetime XP to reach each entitlement tier in the catalog. */
-export const ENTITLEMENT_MIN_XP: Record<EntitlementTier, number> = {
-  Bronze: 0,
-  Silver: 100,
-  Gold: 300,
-  Platinum: 650,
-  Diamond: 1200,
-  Master: 1600,
-  Champion: 2000,
-}
+export const ENTITLEMENT_MIN_XP: Record<EntitlementTier, number> = { ...RANK_MIN_XP }
 
 export const RANK_ENTITLEMENT_REWARD: Record<EntitlementTier, string> = {
   Bronze: 'Standard prize pack',
@@ -32,10 +16,7 @@ export const RANK_ENTITLEMENT_REWARD: Record<EntitlementTier, string> = {
   Champion: 'Upgraded pack + 2 extra boosters (or pack + promo)',
 }
 
-export const RANK_ENTITLEMENT_ENTRY_FEE_NOTE =
-  'Rank entitlement — same entry fee for every tier.'
-
-export const RANK_BADGE_ASSET: Record<EntitlementTier, number> = {
+export const RANK_BADGE_ASSET = {
   Bronze: require('../../assets/ranked/bronze.png'),
   Silver: require('../../assets/ranked/silver.png'),
   Gold: require('../../assets/ranked/gold.png'),
@@ -43,12 +24,15 @@ export const RANK_BADGE_ASSET: Record<EntitlementTier, number> = {
   Diamond: require('../../assets/ranked/diomand.png'),
   Master: require('../../assets/ranked/diomand.png'),
   Champion: require('../../assets/ranked/champion.png'),
-}
+} as const
 
-export function entitlementTierForXp(xp: number): EntitlementTier {
+export const RANK_ENTITLEMENT_ENTRY_FEE_NOTE =
+  'Rank entitlement — same entry fee for every tier.'
+
+export function entitlementTierForXp(xp: number, thresholds = ENTITLEMENT_MIN_XP): EntitlementTier {
   let tier: EntitlementTier = 'Bronze'
   for (const name of ENTITLEMENT_TIER_ORDER) {
-    if (xp >= ENTITLEMENT_MIN_XP[name]) tier = name
+    if (xp >= thresholds[name]) tier = name
   }
   return tier
 }

@@ -180,7 +180,7 @@ export function PlayerSnapshot() {
                 <Image source={RANK_BADGE[rankKey]} style={styles.rankBadge} resizeMode="contain" />
                 <View style={styles.rankTextCol}>
                   <Text style={styles.rankTitle}>{user.rank}</Text>
-                  <Text style={styles.rankXp}>{user.xp} XP</Text>
+                  <Text style={styles.rankXp}>{user.xp} season XP</Text>
                 </View>
               </View>
             </ThemedCard>

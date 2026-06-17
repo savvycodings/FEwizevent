@@ -136,7 +136,7 @@ export function AdminRedeem() {
               >
                 <Text style={styles.playerName}>{p.name}</Text>
                 <Text style={styles.playerMeta}>
-                  {p.rank} · {p.xp} XP
+                  {p.rank} · {p.xp} season XP
                 </Text>
               </Pressable>
             ))}
@@ -147,7 +147,7 @@ export function AdminRedeem() {
               <View style={styles.selectedText}>
                 <Text style={styles.selectedName}>{selected.name}</Text>
                 <Text style={styles.selectedMeta}>
-                  {selected.rank} · {selected.xp.toLocaleString()} XP
+                  {selected.rank} · {selected.xp.toLocaleString()} season XP
                 </Text>
               </View>
               <Pressable
