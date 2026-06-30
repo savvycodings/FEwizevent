@@ -82,7 +82,11 @@ export function Menu({ navigation }: { navigation: any }) {
             <View style={styles.groupStack}>
               {group.items.map((item, ii) => {
                 const onPress =
-                  item.id === 'account' ? () => navigation.navigate('AccountManagement') : undefined
+                  item.id === 'account'
+                    ? () => navigation.navigate('AccountManagement')
+                    : item.id === 'rank-progression'
+                      ? () => navigation.navigate('RankSystemGuide')
+                      : undefined
                 const isLast = ii === group.items.length - 1
                 return (
                   <ListRowCard

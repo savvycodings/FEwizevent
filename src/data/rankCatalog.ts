@@ -41,3 +41,20 @@ export function formatEntitlementXpThreshold(minXp: number): string {
   if (minXp <= 0) return '0 XP'
   return `${minXp.toLocaleString()} XP`
 }
+
+export function entitlementStatusHint(
+  status: 'locked' | 'claimable' | 'claimed' | 'redeemed'
+): string | null {
+  switch (status) {
+    case 'locked':
+      return 'Rank not reached'
+    case 'claimable':
+      return 'Prize available to claim'
+    case 'claimed':
+      return 'Claimed — redeem at prize desk'
+    case 'redeemed':
+      return 'Redeemed'
+    default:
+      return null
+  }
+}

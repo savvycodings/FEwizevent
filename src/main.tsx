@@ -88,9 +88,7 @@ function TopHeader({
         ) : null}
       </View>
       {title ? <Text style={styles.title}>{title}</Text> : <View style={styles.titleSpacer} />}
-      <View style={styles.side}>
-        <AppIcon name="layout-grid" size={20} color={theme.backgroundColor} />
-      </View>
+      <View style={styles.side} />
     </View>
   )
 }
@@ -182,7 +180,7 @@ function Tabs() {
         options={{
           headerShown: true,
           header: ({ navigation }) => (
-            <TopHeader showBack onBack={() => navigation.goBack()} />
+            <TopHeader title="Rank progression" showBack onBack={() => navigation.goBack()} />
           ),
           tabBarButton: () => null,
           tabBarItemStyle: { display: 'none' },

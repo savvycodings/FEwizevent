@@ -68,6 +68,9 @@ export const menuGroups = [
   {
     id: 'settings',
     title: 'Settings',
-    items: [{ id: 'account', title: 'Account Management' }],
+    items: [
+      { id: 'account', title: 'Account Management' },
+      { id: 'rank-progression', title: 'Rank Progression' },
+    ],
   },
 ]
