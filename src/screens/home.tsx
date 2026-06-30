@@ -116,7 +116,7 @@ export function Home({ navigation }: HomeProps) {
     navigation.navigate('AttendedEvents')
   }, [navigation])
   const openRankGuide = useCallback(() => {
-    navigation.navigate('RankSystemGuide')
+    navigation.navigate('RankSystemGuide', { returnTab: 'HomeTab' })
   }, [navigation])
   const openEventPage = useCallback(
     (item: HomeFeedItem) => {

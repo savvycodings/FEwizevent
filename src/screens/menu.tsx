@@ -85,7 +85,7 @@ export function Menu({ navigation }: { navigation: any }) {
                   item.id === 'account'
                     ? () => navigation.navigate('AccountManagement')
                     : item.id === 'rank-progression'
-                      ? () => navigation.navigate('RankSystemGuide')
+                      ? () => navigation.navigate('RankSystemGuide', { returnTab: 'MenuTab' })
                       : undefined
                 const isLast = ii === group.items.length - 1
                 return (

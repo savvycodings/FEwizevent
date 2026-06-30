@@ -179,9 +179,18 @@ function Tabs() {
         component={RankSystemGuide}
         options={{
           headerShown: true,
-          header: ({ navigation }) => (
-            <TopHeader title="Rank progression" showBack onBack={() => navigation.goBack()} />
-          ),
+          header: ({ navigation, route }) => {
+            const returnTab =
+              (route.params as { returnTab?: 'HomeTab' | 'MenuTab' } | undefined)?.returnTab ??
+              'HomeTab'
+            return (
+              <TopHeader
+                title="Rank progression"
+                showBack
+                onBack={() => navigation.navigate(returnTab)}
+              />
+            )
+          },
           tabBarButton: () => null,
           tabBarItemStyle: { display: 'none' },
         }}
@@ -399,7 +408,11 @@ function Tabs() {
         options={{
           headerShown: true,
           header: ({ navigation }) => (
-            <TopHeader title="Account Management" showBack onBack={() => navigation.goBack()} />
+            <TopHeader
+              title="Account Management"
+              showBack
+              onBack={() => navigation.navigate('MenuTab')}
+            />
           ),
           tabBarButton: () => null,
           tabBarItemStyle: { display: 'none' },
