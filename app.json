@@ -24,10 +24,7 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.knoome.wizardevent",
-      "statusBar": {
-        "backgroundColor": "#8FD3FF"
-      }
+      "package": "com.knoome.wizardevent"
     },
     "web": {
       "favicon": "./assets/favicon.png",

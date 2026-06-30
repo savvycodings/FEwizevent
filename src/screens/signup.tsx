@@ -1,5 +1,15 @@
 import { useContext, useState } from 'react'
-import { Alert, Image, StyleSheet, Text, TextInput, View } from 'react-native'
+import {
+  Alert,
+  Image,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native'
 import { AppContext, ThemeContext } from '../context'
 import { ThemedButton, ThemedCard, HomeStoreTabs } from '../components'
 import { DeckPicker } from '../components/content/DeckPicker'
@@ -54,7 +64,7 @@ export function Signup() {
     if (!name.trim() || !email.trim() || !password || !deckId || !/^\d{5,10}$/.test(popTrim)) {
       Alert.alert(
         'Missing fields',
-        'Name, email, password, Player ID (5–10 digits), home store, and deck are required.'
+        'Name, email, password, Play! ID (5–10 digits), home store, and deck are required.'
       )
       return
     }
@@ -82,69 +92,85 @@ export function Signup() {
   }
 
   return (
-    <View style={styles.screen}>
-      <View style={styles.hero}>
-        <Text style={styles.heroTitle}>Create Account</Text>
-      </View>
+    <KeyboardAvoidingView
+      style={styles.screen}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
+      <ScrollView
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.hero}>
+          <Text style={styles.heroTitle}>Create Account</Text>
+        </View>
 
-      <View style={styles.surface}>
-        <ThemedCard>
-          <Text style={styles.title}>Sign Up</Text>
-          <ThemedButton
-            label={profileImage ? 'Change profile picture' : 'Add profile picture'}
-            variant="outline"
-            style={styles.imageButton}
-            onPress={pickProfileImage}
-          />
-          {profileImage ? <Image source={{ uri: profileImage.uri }} style={styles.preview} /> : null}
-          <TextInput
-            style={styles.input}
-            placeholder="Name"
-            placeholderTextColor={theme.mutedForegroundColor}
-            value={name}
-            onChangeText={setName}
-          />
-          <TextInput
-            style={styles.input}
-            placeholder="Player ID (POP / TCG Live)"
-            placeholderTextColor={theme.mutedForegroundColor}
-            keyboardType="number-pad"
-            maxLength={10}
-            value={popId}
-            onChangeText={setPopId}
-          />
-          <TextInput
-            style={styles.input}
-            placeholder="Email"
-            placeholderTextColor={theme.mutedForegroundColor}
-            autoCapitalize="none"
-            value={email}
-            onChangeText={setEmail}
-          />
-          <TextInput
-            style={styles.input}
-            placeholder="Password"
-            placeholderTextColor={theme.mutedForegroundColor}
-            secureTextEntry
-            value={password}
-            onChangeText={setPassword}
-          />
-          <Text style={styles.storeLabel}>Home store</Text>
-          <HomeStoreTabs style={styles.storeTabs} value={homeStore} onChange={setHomeStore} />
-          <Text style={styles.storeLabel}>Current deck</Text>
-          <View style={styles.deckField}>
-            <DeckPicker
-              variant="field"
-              value={deckId}
-              onChange={setDeckId}
-              showFieldLabel={false}
-              placeholder="Tap to choose a deck"
+        <View style={styles.surface}>
+          <ThemedCard>
+            <Text style={styles.title}>Sign Up</Text>
+            <ThemedButton
+              label={profileImage ? 'Change profile picture' : 'Add profile picture'}
+              variant="outline"
+              style={styles.imageButton}
+              onPress={pickProfileImage}
             />
-          </View>
-          <ThemedButton label={loading ? 'Creating...' : 'Sign Up'} onPress={onSignup} />
-        </ThemedCard>
-      </View>
-    </View>
+            {profileImage ? <Image source={{ uri: profileImage.uri }} style={styles.preview} /> : null}
+            <TextInput
+              style={styles.input}
+              placeholder="Name"
+              placeholderTextColor={theme.mutedForegroundColor}
+              textContentType="name"
+              autoComplete="name"
+              value={name}
+              onChangeText={setName}
+            />
+            <TextInput
+              style={styles.input}
+              placeholder="Play! ID"
+              placeholderTextColor={theme.mutedForegroundColor}
+              keyboardType="number-pad"
+              maxLength={10}
+              value={popId}
+              onChangeText={setPopId}
+            />
+            <TextInput
+              style={styles.input}
+              placeholder="Email"
+              placeholderTextColor={theme.mutedForegroundColor}
+              autoCapitalize="none"
+              keyboardType="email-address"
+              textContentType="emailAddress"
+              autoComplete="email"
+              value={email}
+              onChangeText={setEmail}
+            />
+            <TextInput
+              style={styles.input}
+              placeholder="Password"
+              placeholderTextColor={theme.mutedForegroundColor}
+              secureTextEntry
+              textContentType="newPassword"
+              autoComplete="password-new"
+              value={password}
+              onChangeText={setPassword}
+            />
+            <Text style={styles.storeLabel}>Home store</Text>
+            <HomeStoreTabs style={styles.storeTabs} value={homeStore} onChange={setHomeStore} />
+            <Text style={styles.storeLabel}>Current deck</Text>
+            <View style={styles.deckField}>
+              <DeckPicker
+                variant="field"
+                value={deckId}
+                onChange={setDeckId}
+                showFieldLabel={false}
+                placeholder="Tap to choose a deck"
+              />
+            </View>
+            <ThemedButton label={loading ? 'Creating...' : 'Sign Up'} onPress={onSignup} />
+          </ThemedCard>
+        </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
   )
 }
 
@@ -153,6 +179,10 @@ const getStyles = (theme: any) =>
     screen: {
       flex: 1,
       backgroundColor: theme.backgroundColor,
+    },
+    scrollContent: {
+      flexGrow: 1,
+      paddingBottom: SPACING['3xl'],
     },
     hero: {
       backgroundColor: theme.tintColor,
