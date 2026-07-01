@@ -12,14 +12,10 @@ import {
 } from 'react-native'
 import { ThemeContext } from '../../context'
 import { apiRequest } from '../../api'
-import {
-  BADGE_AWARD_TEXT,
-  BADGE_CATALOG_ORDER,
-  BADGE_DISPLAY_TITLE,
-  type BadgeId,
-} from '../../data/badgesCatalog'
 import type { EntitlementStatus, RankEntitlementItem } from '../../data/rankEntitlements'
 import { BadgeVectorIcon } from '../badges/BadgeVectorIcon'
+import type { BadgeId } from '../../data/badgesCatalog'
+import { parseActiveSeasonBadges, type BadgeDefinitionRow } from '../../utils/badgeDefinitions'
 import {
   ENTITLEMENT_MIN_XP,
   ENTITLEMENT_TIER_ORDER,
@@ -54,6 +50,7 @@ export function RanksBadgesModal({
   const styles = getStyles(theme)
   const [entitlements, setEntitlements] = useState<RankEntitlementItem[]>([])
   const [loadingEntitlements, setLoadingEntitlements] = useState(false)
+  const [badgeDefinitions, setBadgeDefinitions] = useState<BadgeDefinitionRow[]>([])
   const [claimingTier, setClaimingTier] = useState<EntitlementTier | null>(null)
   const [currentTier, setCurrentTier] = useState<EntitlementTier>('Bronze')
   const currentEntitlement = currentTier
@@ -64,13 +61,19 @@ export function RanksBadgesModal({
     return map
   }, [entitlements])
 
-  const loadEntitlements = useCallback(async () => {
-    if (!userId) {
-      setEntitlements([])
-      return
-    }
+  const loadModalData = useCallback(async () => {
     try {
       setLoadingEntitlements(true)
+      const leagueRes = await apiRequest<{ badges?: BadgeDefinitionRow[] }>(
+        '/auth/league/active-season'
+      )
+      setBadgeDefinitions(parseActiveSeasonBadges(leagueRes.badges))
+
+      if (!userId) {
+        setEntitlements([])
+        return
+      }
+
       const res = await apiRequest<{
         entitlements: RankEntitlementItem[]
         currentTier?: EntitlementTier
@@ -81,14 +84,15 @@ export function RanksBadgesModal({
       }
     } catch {
       setEntitlements([])
+      setBadgeDefinitions(parseActiveSeasonBadges(undefined))
     } finally {
       setLoadingEntitlements(false)
     }
   }, [userId])
 
   useEffect(() => {
-    if (visible && userId) loadEntitlements()
-  }, [visible, userId, loadEntitlements])
+    if (visible) loadModalData()
+  }, [visible, loadModalData])
 
   const rankRows = useMemo(
     () =>
@@ -109,13 +113,14 @@ export function RanksBadgesModal({
 
   const badgeRows = useMemo(
     () =>
-      BADGE_CATALOG_ORDER.map((id) => ({
-        id,
-        title: BADGE_DISPLAY_TITLE[id],
-        subtitle: BADGE_AWARD_TEXT[id],
-        earned: earnedBadgeIds.has(id),
+      badgeDefinitions.map((def) => ({
+        id: def.id as BadgeId,
+        title: def.title,
+        subtitle: def.description,
+        xpReward: def.xpReward,
+        earned: earnedBadgeIds.has(def.id as BadgeId),
       })),
-    [earnedBadgeIds]
+    [badgeDefinitions, earnedBadgeIds]
   )
 
   async function claimTier(tier: EntitlementTier) {
@@ -198,6 +203,9 @@ export function RanksBadgesModal({
                 <View style={styles.badgeCopy}>
                   <Text style={styles.badgeTitle}>{row.title}</Text>
                   <Text style={styles.badgeSubtitle}>{row.subtitle}</Text>
+                  {row.xpReward > 0 ? (
+                    <Text style={styles.badgeXpNote}>+{row.xpReward} season XP</Text>
+                  ) : null}
                 </View>
                 {row.earned ? (
                   <AppIcon name={SELECTION_ICON_NAME} size={20} color={theme.tintColor} />
@@ -475,6 +483,12 @@ const getStyles = (theme: any) =>
       fontFamily: theme.regularFont,
       fontSize: TYPOGRAPHY.bodySmall,
       lineHeight: Math.round(TYPOGRAPHY.bodySmall * 1.45),
+    },
+    badgeXpNote: {
+      marginTop: 2,
+      color: theme.tintColor,
+      fontFamily: theme.semiBoldFont,
+      fontSize: TYPOGRAPHY.caption,
     },
     badgeLockedDot: {
       width: 10,

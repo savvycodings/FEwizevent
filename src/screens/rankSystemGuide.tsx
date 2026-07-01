@@ -1,7 +1,7 @@
 import { useCallback, useContext, useMemo, useState } from 'react'
 import { Image, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { useFocusEffect } from '@react-navigation/native'
-import { ScreenHero, ScreenSurface, ThemedCard } from '../components'
+import { BadgeVectorIcon, ScreenHero, ScreenSurface, ThemedCard } from '../components'
 import { AppContext, ThemeContext } from '../context'
 import { apiRequest } from '../api'
 import {
@@ -22,6 +22,8 @@ import {
   type EntitlementTier,
 } from '../data/rankCatalog'
 import type { EntitlementStatus, RankEntitlementItem } from '../data/rankEntitlements'
+import type { BadgeId } from '../data/badgesCatalog'
+import { parseActiveSeasonBadges, type BadgeDefinitionRow } from '../utils/badgeDefinitions'
 import { SPACING, TYPOGRAPHY } from '../constants/layout'
 import { HOME_STORE_LABEL, HOME_STORE_ORDER } from '../constants/stores'
 
@@ -49,6 +51,8 @@ export function RankSystemGuide() {
   const [thresholds, setThresholds] = useState<Record<RankTier, number>>(RANK_MIN_XP)
   const [rewardMap, setRewardMap] = useState<Record<EntitlementTier, string>>(RANK_ENTITLEMENT_REWARD)
   const [entitlements, setEntitlements] = useState<RankEntitlementItem[]>([])
+  const [badgeDefinitions, setBadgeDefinitions] = useState<BadgeDefinitionRow[]>(parseActiveSeasonBadges(undefined))
+  const [earnedBadgeIds, setEarnedBadgeIds] = useState<Set<BadgeId>>(new Set())
 
   useFocusEffect(
     useCallback(() => {
@@ -57,15 +61,20 @@ export function RankSystemGuide() {
           rankThresholds?: Record<RankTier, number>
           rewardMap?: Record<EntitlementTier, string>
         } | null
+        badges?: BadgeDefinitionRow[]
       }>('/auth/league/active-season')
         .then((res) => {
           if (res.season?.rankThresholds) setThresholds(res.season.rankThresholds)
           if (res.season?.rewardMap) setRewardMap({ ...RANK_ENTITLEMENT_REWARD, ...res.season.rewardMap })
+          setBadgeDefinitions(parseActiveSeasonBadges(res.badges))
         })
-        .catch(() => {})
+        .catch(() => {
+          setBadgeDefinitions(parseActiveSeasonBadges(undefined))
+        })
 
       if (!currentUser?.id) {
         setEntitlements([])
+        setEarnedBadgeIds(new Set())
         return
       }
 
@@ -74,6 +83,16 @@ export function RankSystemGuide() {
       )
         .then((res) => setEntitlements(res.entitlements ?? []))
         .catch(() => setEntitlements([]))
+
+      apiRequest<{ badges?: { badgeId: BadgeId }[] }>(`/admin/users/${currentUser.id}/details`)
+        .then((res) => {
+          const next = new Set<BadgeId>()
+          for (const badge of res.badges ?? []) {
+            if (badge?.badgeId) next.add(badge.badgeId)
+          }
+          setEarnedBadgeIds(next)
+        })
+        .catch(() => setEarnedBadgeIds(new Set()))
     }, [currentUser?.id])
   )
 
@@ -96,6 +115,18 @@ export function RankSystemGuide() {
         }
       }),
     [entitlementByTier, rewardMap, thresholds]
+  )
+
+  const badgeRows = useMemo(
+    () =>
+      badgeDefinitions.map((def) => ({
+        id: def.id,
+        title: def.title,
+        blurb: def.description,
+        xpReward: def.xpReward,
+        earned: earnedBadgeIds.has(def.id as BadgeId),
+      })),
+    [badgeDefinitions, earnedBadgeIds]
   )
 
   return (
@@ -166,6 +197,20 @@ export function RankSystemGuide() {
           To claim rank rewards you have earned, visit one of our official stores ({OFFICIAL_STORES}).
           A staff member will redeem your entitlement in the app and hand you the prizes you have unlocked.
         </Text>
+
+        <Text style={[styles.sectionTitle, styles.sectionTitleSpaced]}>Badges you can earn</Text>
+        <Text style={styles.hint}>
+          Earn badges at events. Some are awarded automatically; others are given by staff at the prize desk.
+        </Text>
+        {badgeRows.map((row, index) => (
+          <BadgeGuideRow
+            key={row.id}
+            styles={styles}
+            theme={theme}
+            row={row}
+            isLast={index === badgeRows.length - 1}
+          />
+        ))}
       </ScreenSurface>
     </ScrollView>
   )
@@ -201,6 +246,47 @@ function RankGuideRow({
           </Text>
           <Text style={styles.rankReward}>{reward}</Text>
           {statusHint ? <Text style={styles.rankStatus}>{statusHint}</Text> : null}
+        </View>
+      </View>
+    </ThemedCard>
+  )
+}
+
+function BadgeGuideRow({
+  styles,
+  theme,
+  row,
+  isLast,
+}: {
+  styles: ReturnType<typeof getStyles>
+  theme: { tintColor: string; mutedForegroundColor: string }
+  row: {
+    id: string
+    title: string
+    blurb: string
+    xpReward: number
+    earned: boolean
+  }
+  isLast: boolean
+}) {
+  return (
+    <ThemedCard compact style={isLast ? styles.badgeCardLast : styles.badgeCard}>
+      <View style={styles.badgeRow}>
+        <View style={styles.badgeCopy}>
+          <Text style={styles.badgeTitle}>{row.title}</Text>
+          <Text style={styles.badgeBlurb}>{row.blurb}</Text>
+          {row.xpReward > 0 ? (
+            <Text style={styles.badgeXp}>+{row.xpReward} season XP (one-time)</Text>
+          ) : null}
+          {row.earned ? <Text style={styles.badgeEarned}>Earned this season</Text> : null}
+        </View>
+        <View style={styles.badgeIconWrap}>
+          <BadgeVectorIcon
+            badgeId={row.id}
+            size={44}
+            color={row.earned ? theme.tintColor : theme.mutedForegroundColor}
+            opacity={row.earned ? 1 : 0.45}
+          />
         </View>
       </View>
     </ThemedCard>
@@ -308,5 +394,52 @@ const getStyles = (theme: any) =>
       color: theme.mutedForegroundColor,
       fontFamily: theme.regularFont,
       fontSize: TYPOGRAPHY.caption,
+    },
+    badgeCard: {
+      marginTop: SPACING.sm,
+    },
+    badgeCardLast: {
+      marginTop: SPACING.sm,
+      marginBottom: 0,
+    },
+    badgeRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: SPACING.md,
+    },
+    badgeCopy: {
+      flex: 1,
+      minWidth: 0,
+    },
+    badgeTitle: {
+      color: theme.textColor,
+      fontFamily: theme.boldFont,
+      fontSize: TYPOGRAPHY.body,
+      lineHeight: TYPOGRAPHY.body * 1.25,
+    },
+    badgeBlurb: {
+      marginTop: SPACING.xs,
+      color: theme.mutedForegroundColor,
+      fontFamily: theme.regularFont,
+      fontSize: TYPOGRAPHY.caption,
+      lineHeight: Math.round(TYPOGRAPHY.caption * 1.45),
+    },
+    badgeXp: {
+      marginTop: SPACING.xs,
+      color: theme.tintColor,
+      fontFamily: theme.semiBoldFont,
+      fontSize: TYPOGRAPHY.caption,
+    },
+    badgeEarned: {
+      marginTop: SPACING.xs,
+      color: theme.tintColor,
+      fontFamily: theme.semiBoldFont,
+      fontSize: TYPOGRAPHY.caption,
+    },
+    badgeIconWrap: {
+      width: 44,
+      height: 44,
+      alignItems: 'center',
+      justifyContent: 'center',
     },
   })

@@ -17,7 +17,7 @@ export type BadgeVectorName =
   'Abstract9Shapes' |
   'Abstract12Shapes'
 
-export const BADGE_VECTOR_BY_ID: Record<BadgeId, BadgeVectorName> = {
+export const BADGE_VECTOR_BY_ID: Partial<Record<BadgeId, BadgeVectorName>> = {
   placed1st: 'Star1Shapes',
   placed2nd: 'Star4Shapes',
   placed3rd: 'Star6Shapes',

@@ -7,7 +7,7 @@ import { Input, ThemedButton, ThemedCard } from '../components'
 import { DeckPicker } from '../components/content/DeckPicker'
 import { RADIUS, SPACING, TYPOGRAPHY } from '../constants/layout'
 import { apiRequest } from '../api'
-import { BADGE_DISPLAY_TITLE, type BadgeId } from '../data/badgesCatalog'
+import { BADGE_DISPLAY_TITLE, MANUAL_AWARD_BADGE_ORDER, type BadgeId, type ManualAwardBadgeId } from '../data/badgesCatalog'
 
 type User = {
   id: number
@@ -35,17 +35,7 @@ type PlacementBoardRow = {
   suggestedDeckId?: string | null
 }
 
-type ManualBadgeId = Exclude<BadgeId, 'placed1st' | 'placed2nd' | 'placed3rd'>
-
-const BADGES_TO_AWARD: ManualBadgeId[] = [
-  'champion',
-  'magician',
-  'sweat',
-  'scholar',
-  'quick',
-  'scientist',
-  'flawless',
-]
+const BADGES_TO_AWARD = MANUAL_AWARD_BADGE_ORDER
 
 function formatEventDateLabel(eventDate: string | null): string {
   if (!eventDate) return 'Date TBA'
@@ -111,7 +101,7 @@ export function AdminPlayerAttendance() {
   }, [placeNum])
 
   const badgeRows = useMemo(() => {
-    const rows: ManualBadgeId[][] = []
+    const rows: ManualAwardBadgeId[][] = []
     for (let i = 0; i < BADGES_TO_AWARD.length; i += 2) {
       rows.push(BADGES_TO_AWARD.slice(i, i + 2))
     }

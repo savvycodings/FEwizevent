@@ -5,8 +5,13 @@ import Svg, { Path } from 'react-native-svg'
 import type { AnimatedStyle } from 'react-native-reanimated'
 import Animated from 'react-native-reanimated'
 import type { BadgeId } from '@/data/badgesCatalog'
-import { BADGE_DISPLAY_TITLE } from '@/data/badgesCatalog'
+import { badgeDisplayTitle } from '@/data/badgesCatalog'
 import { BRAND } from '@/constants/brandColors'
+import {
+  ACHIEVEMENT_ICON_FALLBACK,
+  ACHIEVEMENT_ICON_PATHS,
+  type AchievementIconPath,
+} from './achievementIconPaths'
 import {
   BADGE_VECTOR_BY_ID,
   BADGE_VECTOR_PATHS,
@@ -16,7 +21,7 @@ import {
 export const DEFAULT_BADGE_ICON_COLOR = BRAND.heroInk
 
 export type BadgeVectorIconProps = {
-  badgeId?: BadgeId
+  badgeId?: string
   vector?: BadgeVectorName
   size?: number
   color?: string
@@ -27,11 +32,23 @@ export type BadgeVectorIconProps = {
 }
 
 function resolveVector(
-  badgeId?: BadgeId,
+  badgeId?: string,
   vector?: BadgeVectorName
 ): BadgeVectorName | null {
   if (vector) return vector
-  if (badgeId) return BADGE_VECTOR_BY_ID[badgeId]
+  if (badgeId && badgeId in BADGE_VECTOR_BY_ID) {
+    return BADGE_VECTOR_BY_ID[badgeId as BadgeId]
+  }
+  return null
+}
+
+function resolveIconPath(badgeId?: string, vector?: BadgeVectorName): AchievementIconPath | null {
+  if (badgeId && ACHIEVEMENT_ICON_PATHS[badgeId]) {
+    return ACHIEVEMENT_ICON_PATHS[badgeId]
+  }
+  const name = resolveVector(badgeId, vector)
+  if (name) return BADGE_VECTOR_PATHS[name]
+  if (badgeId) return ACHIEVEMENT_ICON_FALLBACK
   return null
 }
 
@@ -63,9 +80,10 @@ export function BadgeVectorIcon({
   accessibilityLabel,
 }: BadgeVectorIconProps) {
   const name = resolveVector(badgeId, vector)
+  const iconPath = resolveIconPath(badgeId, vector)
   const label =
     accessibilityLabel ??
-    (badgeId ? BADGE_DISPLAY_TITLE[badgeId] : undefined) ??
+    (badgeId ? badgeDisplayTitle(badgeId) : undefined) ??
     name ??
     'Badge'
 
@@ -74,9 +92,9 @@ export function BadgeVectorIcon({
     [size, style]
   )
 
-  if (!name) return null
+  if (!iconPath) return null
 
-  const { viewBox, d } = BADGE_VECTOR_PATHS[name]
+  const { viewBox, d, fillRule } = iconPath
   const paddedViewBox = expandViewBox(viewBox)
 
   const svg = (
@@ -87,7 +105,7 @@ export function BadgeVectorIcon({
       preserveAspectRatio="xMidYMid meet"
       accessibilityLabel={label}
     >
-      <Path d={d} fill={color} opacity={opacity} />
+      <Path d={d} fill={color} opacity={opacity} fillRule={fillRule} fillOpacity={1} />
     </Svg>
   )
 

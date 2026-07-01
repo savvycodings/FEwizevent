@@ -24,7 +24,7 @@ import { DeckPicker } from '../components/content/DeckPicker'
 import { DeckIcon } from '../components/decks/DeckIcon'
 import { deckLabelForId } from '../constants/deckCatalog'
 import { ThemeContext } from '../context'
-import { BADGE_DISPLAY_TITLE, type BadgeId } from '../data/badgesCatalog'
+import { BADGE_DISPLAY_TITLE, MANUAL_AWARD_BADGE_ORDER, type BadgeId, type ManualAwardBadgeId } from '../data/badgesCatalog'
 import {
   EVENT_TIER_LABEL,
   formatTierMultiplier,
@@ -71,17 +71,7 @@ type EarnedBadge = {
   eventTitle: string | null
 }
 
-type ManualBadgeId = Exclude<BadgeId, 'placed1st' | 'placed2nd' | 'placed3rd'>
-
-const MANUAL_BADGES: ManualBadgeId[] = [
-  'champion',
-  'magician',
-  'sweat',
-  'scholar',
-  'quick',
-  'scientist',
-  'flawless',
-]
+const MANUAL_BADGES = MANUAL_AWARD_BADGE_ORDER
 
 type ManageTab = 'players' | 'leaderboard' | 'awards' | 'settings'
 
@@ -357,7 +347,7 @@ export function AdminEventManage({ navigation }: { navigation: any }) {
     setAwardPickerFor(null)
   }
 
-  async function toggleManualBadge(badgeId: ManualBadgeId) {
+  async function toggleManualBadge(badgeId: ManualAwardBadgeId) {
     if (!selectedUserId) return
     const already = earnedBadges.some((b) => b.badgeId === badgeId)
     try {
@@ -1087,9 +1077,10 @@ const getStyles = (theme: any) =>
       flexDirection: 'row',
       flexWrap: 'wrap',
       gap: SPACING.sm,
+      justifyContent: 'space-between',
     },
     badgeOption: {
-      width: '30%',
+      width: '31%',
       minWidth: 96,
       alignItems: 'center',
       borderWidth: 1.5,

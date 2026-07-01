@@ -3,16 +3,12 @@ import { ScrollView, StyleSheet, Text, View } from 'react-native'
 import { useFocusEffect } from '@react-navigation/native'
 import { AppContext, ThemeContext } from '../context'
 import { BadgeVectorIcon, ThemedCard } from '../components'
-import { BADGE_CATALOG_ORDER, BADGE_DISPLAY_TITLE, type BadgeId } from '../data/badgesCatalog'
+import type { BadgeId } from '../data/badgesCatalog'
+import { parseActiveSeasonBadges, type BadgeDefinitionRow } from '../utils/badgeDefinitions'
 import { RADIUS, SPACING, TYPOGRAPHY } from '../constants/layout'
 import { apiRequest } from '../api'
 
-type BadgeDef = {
-  id: string
-  title: string
-  description: string
-  xpReward: number
-}
+type BadgeDef = BadgeDefinitionRow
 
 type EarnedBadge = { badgeId: BadgeId }
 
@@ -43,22 +39,10 @@ export function BadgesCatalog() {
   const loadDefinitions = useCallback(async () => {
     try {
       const res = await apiRequest<{ badges?: BadgeDef[] }>('/auth/league/active-season')
-      const list = Array.isArray(res.badges) ? res.badges : []
-      if (list.length > 0) {
-        setDefinitions(list)
-        return
-      }
+      setDefinitions(parseActiveSeasonBadges(res.badges))
     } catch {
-      /* fallback below */
+      setDefinitions(parseActiveSeasonBadges(undefined))
     }
-    setDefinitions(
-      BADGE_CATALOG_ORDER.map((id) => ({
-        id,
-        title: BADGE_DISPLAY_TITLE[id],
-        description: '',
-        xpReward: 0,
-      }))
-    )
   }, [])
 
   useFocusEffect(

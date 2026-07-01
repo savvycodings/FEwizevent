@@ -9,7 +9,6 @@ import {
   withRepeat,
   withTiming,
 } from 'react-native-reanimated'
-import type { BadgeId } from '@/data/badgesCatalog'
 import type { BadgeVectorIconProps } from './BadgeVectorIcon'
 import { BadgeVectorIcon } from './BadgeVectorIcon'
 
@@ -17,7 +16,7 @@ const CYCLE_MS = 16_000
 const ROTATE_DEG = 3
 const PULSE_AMOUNT = 0.02
 
-function phaseDelayMs(badgeId: BadgeId): number {
+function phaseDelayMs(badgeId: string): number {
   let h = 0
   for (let i = 0; i < badgeId.length; i++) {
     h = (h * 31 + badgeId.charCodeAt(i)) | 0
