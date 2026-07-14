@@ -136,7 +136,7 @@ export function AccountManagement() {
       if (email !== (currentUser.email || '').toLowerCase()) body.email = email
       if (storedHomeStore(currentUser) !== homeStore) body.homeStore = homeStore
       if (body.name === undefined && body.email === undefined && body.homeStore === undefined) {
-        Alert.alert('No changes', 'Update your name, email, or home store to save.')
+        Alert.alert('No changes.', 'Update your name, email, or home store to save.')
         return
       }
 
