@@ -16,7 +16,6 @@ import { LinearGradient } from 'expo-linear-gradient'
 import { AppContext, ThemeContext } from '../context'
 import {
   AppIcon,
-  BadgeVectorIcon,
   FeedEventCard,
   MotionBadgeIcon,
   RankProgressCard,
@@ -24,7 +23,6 @@ import {
   ScreenSurface,
   Section,
   StatTile,
-  RanksBadgesModal,
 } from '../components'
 import { CommunityDeckMetaSection } from '../components/content/CommunityDeckMetaSection'
 import { DeckPicker } from '../components/content/DeckPicker'
@@ -138,7 +136,6 @@ export function Home({ navigation }: HomeProps) {
   const [earnedBadges, setEarnedBadges] = useState<EarnedBadge[]>([])
   const [selectedBadge, setSelectedBadge] = useState<EarnedBadge | null>(null)
   const [qrModalVisible, setQrModalVisible] = useState(false)
-  const [ranksBadgesModalVisible, setRanksBadgesModalVisible] = useState(false)
   const [activeDeckId, setActiveDeckId] = useState<string | null>(null)
   const [deckSaving, setDeckSaving] = useState(false)
 
@@ -227,11 +224,6 @@ export function Home({ navigation }: HomeProps) {
     useCallback(() => {
       loadHome()
     }, [loadHome])
-  )
-
-  const earnedBadgeIds = useMemo(
-    () => new Set(earnedBadges.map((b) => b.badgeId)),
-    [earnedBadges]
   )
 
   const statColumnWidth = useMemo(() => {
@@ -381,12 +373,6 @@ export function Home({ navigation }: HomeProps) {
                   />
                 }
                 accentColor={item.accent}
-                onPress={
-                  item.id === 'badges' ? () => setRanksBadgesModalVisible(true) : undefined
-                }
-                accessibilityLabel={
-                  item.id === 'badges' ? 'View ranks, badges, and rewards' : item.label
-                }
               />
             </View>
           ))}
@@ -428,9 +414,6 @@ export function Home({ navigation }: HomeProps) {
         <Section
           title="Badges earned"
           compactTopSpacing
-          onPressSeeAll={
-            earnedBadges.length > 0 ? () => setRanksBadgesModalVisible(true) : undefined
-          }
         >
           {earnedBadges.length > 0 ? (
             <View style={styles.earnedBadgesGrid}>
@@ -555,14 +538,6 @@ export function Home({ navigation }: HomeProps) {
           </Pressable>
         </Pressable>
       </Modal>
-
-      <RanksBadgesModal
-        visible={ranksBadgesModalVisible}
-        onClose={() => setRanksBadgesModalVisible(false)}
-        userId={currentUser?.id}
-        currentXp={currentXp}
-        earnedBadgeIds={earnedBadgeIds}
-      />
 
       <Modal
         visible={qrModalVisible}

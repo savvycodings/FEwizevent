@@ -4,6 +4,7 @@ import {
   Image,
   KeyboardAvoidingView,
   Platform,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -11,7 +12,7 @@ import {
   View,
 } from 'react-native'
 import { AppContext, ThemeContext } from '../context'
-import { ThemedButton, ThemedCard, HomeStoreTabs } from '../components'
+import { AppIcon, ThemedButton, ThemedCard, HomeStoreTabs } from '../components'
 import { DeckPicker } from '../components/content/DeckPicker'
 import { type HomeStore } from '../constants/stores'
 import { RADIUS, SPACING, TYPOGRAPHY } from '../constants/layout'
@@ -19,7 +20,7 @@ import { apiRequest, readJsonResponse } from '../api'
 import { pickImageWithSource } from '../utils/pickImageWithSource'
 import { DOMAIN } from '../../constants'
 
-export function Signup() {
+export function Signup({ navigation }: { navigation: any }) {
   const { theme } = useContext(ThemeContext)
   const { setCurrentUser } = useContext(AppContext)
   const styles = getStyles(theme)
@@ -31,6 +32,14 @@ export function Signup() {
   const [deckId, setDeckId] = useState<string | null>(null)
   const [popId, setPopId] = useState('')
   const [loading, setLoading] = useState(false)
+
+  function goBackToLogin() {
+    if (navigation.canGoBack?.()) {
+      navigation.goBack()
+      return
+    }
+    navigation.navigate('Login')
+  }
 
   async function pickProfileImage() {
     const asset = await pickImageWithSource({
@@ -102,7 +111,18 @@ export function Signup() {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.hero}>
-          <Text style={styles.heroTitle}>Create Account</Text>
+          <View style={styles.heroRow}>
+            <Pressable
+              onPress={goBackToLogin}
+              hitSlop={8}
+              style={styles.backButton}
+              accessibilityRole="button"
+              accessibilityLabel="Back to log in"
+            >
+              <AppIcon name="arrow-back" size={22} color={theme.backgroundColor} />
+            </Pressable>
+            <Text style={styles.heroTitle}>Create Account</Text>
+          </View>
         </View>
 
         <View style={styles.surface}>
@@ -167,6 +187,12 @@ export function Signup() {
               />
             </View>
             <ThemedButton label={loading ? 'Creating...' : 'Sign Up'} onPress={onSignup} />
+            <ThemedButton
+              label="Back to log in"
+              variant="outline"
+              style={styles.secondaryButton}
+              onPress={goBackToLogin}
+            />
           </ThemedCard>
         </View>
       </ScrollView>
@@ -190,7 +216,16 @@ const getStyles = (theme: any) =>
       paddingTop: SPACING['4xl'],
       paddingBottom: SPACING['4xl'],
     },
+    heroRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: SPACING.sm,
+    },
+    backButton: {
+      paddingVertical: 2,
+    },
     heroTitle: {
+      flex: 1,
       color: theme.backgroundColor,
       fontFamily: theme.boldFont,
       fontSize: TYPOGRAPHY.h2,
@@ -245,5 +280,8 @@ const getStyles = (theme: any) =>
       borderColor: theme.borderColor,
       marginBottom: SPACING.md,
       alignSelf: 'center',
+    },
+    secondaryButton: {
+      marginTop: SPACING.sm,
     },
   })

@@ -1,7 +1,14 @@
 import { useCallback, useContext, useMemo, useState } from 'react'
-import { Image, ScrollView, StyleSheet, Text, View } from 'react-native'
+import {
+  FlatList,
+  Image,
+  StyleSheet,
+  Text,
+  View,
+  type ListRenderItemInfo,
+} from 'react-native'
 import { useFocusEffect } from '@react-navigation/native'
-import { BadgeVectorIcon, ScreenHero, ScreenSurface, ThemedCard } from '../components'
+import { BadgeVectorIcon, ThemedCard } from '../components'
 import { AppContext, ThemeContext } from '../context'
 import { apiRequest } from '../api'
 import {
@@ -24,7 +31,7 @@ import {
 import type { EntitlementStatus, RankEntitlementItem } from '../data/rankEntitlements'
 import type { BadgeId } from '../data/badgesCatalog'
 import { parseActiveSeasonBadges, type BadgeDefinitionRow } from '../utils/badgeDefinitions'
-import { SPACING, TYPOGRAPHY } from '../constants/layout'
+import { RADIUS, SPACING, TYPOGRAPHY } from '../constants/layout'
 import { HOME_STORE_LABEL, HOME_STORE_ORDER } from '../constants/stores'
 
 const OFFICIAL_STORES = HOME_STORE_ORDER.map((store) => HOME_STORE_LABEL[store]).join(' or ')
@@ -44,6 +51,31 @@ const TIER_ROWS: { label: string; multiplier: number }[] = [
   { label: 'Cup', multiplier: EVENT_TIER_MULTIPLIER.cup },
 ]
 
+type RankRow = {
+  tier: RankTier
+  minXp: number
+  xpRange: string
+  reward: string
+  status: EntitlementStatus | null
+}
+
+type BadgeRow = {
+  id: string
+  title: string
+  blurb: string
+  xpReward: number
+  earned: boolean
+}
+
+type GuideItem =
+  | { key: string; kind: 'section'; title: string; hint?: string; spaced?: boolean }
+  | { key: string; kind: 'placement' }
+  | { key: string; kind: 'tiers' }
+  | { key: string; kind: 'judged' }
+  | { key: string; kind: 'rank'; row: RankRow; isLast: boolean }
+  | { key: string; kind: 'claim' }
+  | { key: string; kind: 'badge'; row: BadgeRow; isLast: boolean }
+
 export function RankSystemGuide() {
   const { theme } = useContext(ThemeContext)
   const { currentUser } = useContext(AppContext)
@@ -51,48 +83,69 @@ export function RankSystemGuide() {
   const [thresholds, setThresholds] = useState<Record<RankTier, number>>(RANK_MIN_XP)
   const [rewardMap, setRewardMap] = useState<Record<EntitlementTier, string>>(RANK_ENTITLEMENT_REWARD)
   const [entitlements, setEntitlements] = useState<RankEntitlementItem[]>([])
-  const [badgeDefinitions, setBadgeDefinitions] = useState<BadgeDefinitionRow[]>(parseActiveSeasonBadges(undefined))
+  const [badgeDefinitions, setBadgeDefinitions] = useState<BadgeDefinitionRow[]>(
+    parseActiveSeasonBadges(undefined)
+  )
   const [earnedBadgeIds, setEarnedBadgeIds] = useState<Set<BadgeId>>(new Set())
 
   useFocusEffect(
     useCallback(() => {
-      apiRequest<{
-        season?: {
-          rankThresholds?: Record<RankTier, number>
-          rewardMap?: Record<EntitlementTier, string>
-        } | null
-        badges?: BadgeDefinitionRow[]
-      }>('/auth/league/active-season')
-        .then((res) => {
-          if (res.season?.rankThresholds) setThresholds(res.season.rankThresholds)
-          if (res.season?.rewardMap) setRewardMap({ ...RANK_ENTITLEMENT_REWARD, ...res.season.rewardMap })
-          setBadgeDefinitions(parseActiveSeasonBadges(res.badges))
-        })
-        .catch(() => {
-          setBadgeDefinitions(parseActiveSeasonBadges(undefined))
-        })
+      let cancelled = false
 
-      if (!currentUser?.id) {
-        setEntitlements([])
-        setEarnedBadgeIds(new Set())
-        return
+      async function load() {
+        const seasonPromise = apiRequest<{
+          season?: {
+            rankThresholds?: Record<RankTier, number>
+            rewardMap?: Record<EntitlementTier, string>
+          } | null
+          badges?: BadgeDefinitionRow[]
+        }>('/auth/league/active-season')
+          .then((res) => res)
+          .catch(() => null)
+
+        const entitlementsPromise =
+          currentUser?.id != null
+            ? apiRequest<{ entitlements?: RankEntitlementItem[] }>(
+                `/auth/rank-entitlements?userId=${currentUser.id}`
+              )
+                .then((res) => res.entitlements ?? [])
+                .catch(() => [] as RankEntitlementItem[])
+            : Promise.resolve([] as RankEntitlementItem[])
+
+        const badgesPromise =
+          currentUser?.id != null
+            ? apiRequest<{ badges?: { badgeId: BadgeId }[] }>(`/admin/users/${currentUser.id}/details`)
+                .then((res) => {
+                  const next = new Set<BadgeId>()
+                  for (const badge of res.badges ?? []) {
+                    if (badge?.badgeId) next.add(badge.badgeId)
+                  }
+                  return next
+                })
+                .catch(() => new Set<BadgeId>())
+            : Promise.resolve(new Set<BadgeId>())
+
+        const [seasonRes, nextEntitlements, nextEarned] = await Promise.all([
+          seasonPromise,
+          entitlementsPromise,
+          badgesPromise,
+        ])
+
+        if (cancelled) return
+
+        if (seasonRes?.season?.rankThresholds) setThresholds(seasonRes.season.rankThresholds)
+        if (seasonRes?.season?.rewardMap) {
+          setRewardMap({ ...RANK_ENTITLEMENT_REWARD, ...seasonRes.season.rewardMap })
+        }
+        setBadgeDefinitions(parseActiveSeasonBadges(seasonRes?.badges))
+        setEntitlements(nextEntitlements)
+        setEarnedBadgeIds(nextEarned)
       }
 
-      apiRequest<{ entitlements?: RankEntitlementItem[] }>(
-        `/auth/rank-entitlements?userId=${currentUser.id}`
-      )
-        .then((res) => setEntitlements(res.entitlements ?? []))
-        .catch(() => setEntitlements([]))
-
-      apiRequest<{ badges?: { badgeId: BadgeId }[] }>(`/admin/users/${currentUser.id}/details`)
-        .then((res) => {
-          const next = new Set<BadgeId>()
-          for (const badge of res.badges ?? []) {
-            if (badge?.badgeId) next.add(badge.badgeId)
-          }
-          setEarnedBadgeIds(next)
-        })
-        .catch(() => setEarnedBadgeIds(new Set()))
+      void load()
+      return () => {
+        cancelled = true
+      }
     }, [currentUser?.id])
   )
 
@@ -129,122 +182,167 @@ export function RankSystemGuide() {
     [badgeDefinitions, earnedBadgeIds]
   )
 
+  const listItems = useMemo<GuideItem[]>(() => {
+    const items: GuideItem[] = [
+      {
+        key: 'sec-placements',
+        kind: 'section',
+        title: 'XP from placements',
+        hint: 'Size bonus: +2 XP per opponent (1st), +1 (2nd), then × event tier.',
+      },
+      { key: 'placement', kind: 'placement' },
+      { key: 'sec-tiers', kind: 'section', title: 'Event tiers', spaced: true },
+      { key: 'tiers', kind: 'tiers' },
+      { key: 'sec-judged', kind: 'section', title: 'Judged awards', spaced: true },
+      { key: 'judged', kind: 'judged' },
+      {
+        key: 'sec-ranks',
+        kind: 'section',
+        title: 'All ranks',
+        spaced: true,
+        hint: 'Season rank is from season XP. Resets each season. Each rank unlocks a prize entitlement.',
+      },
+      ...rankRows.map((row, index) => ({
+        key: `rank-${row.tier}`,
+        kind: 'rank' as const,
+        row,
+        isLast: index === rankRows.length - 1,
+      })),
+      { key: 'sec-claim', kind: 'section', title: 'Claiming your rewards', spaced: true },
+      { key: 'claim', kind: 'claim' },
+      {
+        key: 'sec-badges',
+        kind: 'section',
+        title: 'Badges you can earn',
+        spaced: true,
+        hint: 'Earn badges at events. Some are awarded automatically; others are given by staff at the prize desk.',
+      },
+      ...badgeRows.map((row, index) => ({
+        key: `badge-${row.id}`,
+        kind: 'badge' as const,
+        row,
+        isLast: index === badgeRows.length - 1,
+      })),
+    ]
+    return items
+  }, [badgeRows, rankRows])
+
+  const renderItem = useCallback(
+    ({ item }: ListRenderItemInfo<GuideItem>) => {
+      switch (item.kind) {
+        case 'section':
+          return (
+            <View>
+              <Text style={[styles.sectionTitle, item.spaced && styles.sectionTitleSpaced]}>
+                {item.title}
+              </Text>
+              {item.hint ? <Text style={styles.hint}>{item.hint}</Text> : null}
+            </View>
+          )
+        case 'placement':
+          return (
+            <ThemedCard compact style={styles.card}>
+              {PLACEMENT_ROWS.map((row, index) => (
+                <View
+                  key={row.label}
+                  style={[styles.dataRow, index < PLACEMENT_ROWS.length - 1 && styles.dataRowBorder]}
+                >
+                  <Text style={styles.dataLabel}>{row.label}</Text>
+                  <Text style={styles.dataValue}>{row.xp} XP base</Text>
+                </View>
+              ))}
+            </ThemedCard>
+          )
+        case 'tiers':
+          return (
+            <ThemedCard compact style={styles.card}>
+              {TIER_ROWS.map((row, index) => (
+                <View
+                  key={row.label}
+                  style={[styles.dataRow, index < TIER_ROWS.length - 1 && styles.dataRowBorder]}
+                >
+                  <Text style={styles.dataLabel}>{row.label}</Text>
+                  <Text style={styles.dataValue}>×{row.multiplier.toFixed(1)} XP</Text>
+                </View>
+              ))}
+            </ThemedCard>
+          )
+        case 'judged':
+          return (
+            <ThemedCard compact style={styles.card}>
+              <View style={styles.dataRow}>
+                <Text style={styles.dataLabel}>Best Bling / Best Rogue</Text>
+                <Text style={styles.dataValue}>{JUDGED_AWARD_BASE_XP} XP base</Text>
+              </View>
+            </ThemedCard>
+          )
+        case 'rank':
+          return <RankGuideRow styles={styles} row={item.row} isLast={item.isLast} />
+        case 'claim':
+          return (
+            <Text style={styles.claimHint}>
+              To claim rank rewards you have earned, visit one of our official stores ({OFFICIAL_STORES}).
+              A staff member will redeem your entitlement in the app and hand you the prizes you have
+              unlocked.
+            </Text>
+          )
+        case 'badge':
+          return (
+            <BadgeGuideRow styles={styles} theme={theme} row={item.row} isLast={item.isLast} />
+          )
+        default:
+          return null
+      }
+    },
+    [styles, theme]
+  )
+
   return (
-    <ScrollView
+    <FlatList
       style={styles.screen}
       contentContainerStyle={styles.content}
+      data={listItems}
+      keyExtractor={(item) => item.key}
+      renderItem={renderItem}
       showsVerticalScrollIndicator={false}
-    >
-      <ScreenHero title="">
-        <View />
-      </ScreenHero>
-
-      <ScreenSurface style={styles.surface}>
-        <Text style={styles.sectionTitle}>XP from placements</Text>
-        <Text style={styles.hint}>Size bonus: +2 XP per opponent (1st), +1 (2nd), then × event tier.</Text>
-        <ThemedCard compact style={styles.card}>
-          {PLACEMENT_ROWS.map((row, index) => (
-            <View
-              key={row.label}
-              style={[styles.dataRow, index < PLACEMENT_ROWS.length - 1 && styles.dataRowBorder]}
-            >
-              <Text style={styles.dataLabel}>{row.label}</Text>
-              <Text style={styles.dataValue}>{row.xp} XP base</Text>
-            </View>
-          ))}
-        </ThemedCard>
-
-        <Text style={[styles.sectionTitle, styles.sectionTitleSpaced]}>Event tiers</Text>
-        <ThemedCard compact style={styles.card}>
-          {TIER_ROWS.map((row, index) => (
-            <View
-              key={row.label}
-              style={[styles.dataRow, index < TIER_ROWS.length - 1 && styles.dataRowBorder]}
-            >
-              <Text style={styles.dataLabel}>{row.label}</Text>
-              <Text style={styles.dataValue}>×{row.multiplier.toFixed(1)} XP</Text>
-            </View>
-          ))}
-        </ThemedCard>
-
-        <Text style={[styles.sectionTitle, styles.sectionTitleSpaced]}>Judged awards</Text>
-        <ThemedCard compact style={styles.card}>
-          <View style={styles.dataRow}>
-            <Text style={styles.dataLabel}>Best Bling / Best Rogue</Text>
-            <Text style={styles.dataValue}>{JUDGED_AWARD_BASE_XP} XP base</Text>
-          </View>
-        </ThemedCard>
-
-        <Text style={[styles.sectionTitle, styles.sectionTitleSpaced]}>All ranks</Text>
-        <Text style={styles.hint}>
-          Season rank is from season XP. Resets each season. Each rank unlocks a prize entitlement.
-        </Text>
-        {rankRows.map((row, index) => (
-          <RankGuideRow
-            key={row.tier}
-            styles={styles}
-            tier={row.tier}
-            minXp={row.minXp}
-            xpRange={row.xpRange}
-            reward={row.reward}
-            status={row.status}
-            isLast={index === rankRows.length - 1}
-          />
-        ))}
-
-        <Text style={[styles.sectionTitle, styles.sectionTitleSpaced]}>Claiming your rewards</Text>
-        <Text style={styles.claimHint}>
-          To claim rank rewards you have earned, visit one of our official stores ({OFFICIAL_STORES}).
-          A staff member will redeem your entitlement in the app and hand you the prizes you have unlocked.
-        </Text>
-
-        <Text style={[styles.sectionTitle, styles.sectionTitleSpaced]}>Badges you can earn</Text>
-        <Text style={styles.hint}>
-          Earn badges at events. Some are awarded automatically; others are given by staff at the prize desk.
-        </Text>
-        {badgeRows.map((row, index) => (
-          <BadgeGuideRow
-            key={row.id}
-            styles={styles}
-            theme={theme}
-            row={row}
-            isLast={index === badgeRows.length - 1}
-          />
-        ))}
-      </ScreenSurface>
-    </ScrollView>
+      scrollEventThrottle={16}
+      keyboardShouldPersistTaps="handled"
+      removeClippedSubviews
+      initialNumToRender={12}
+      windowSize={8}
+      maxToRenderPerBatch={8}
+      updateCellsBatchingPeriod={50}
+    />
   )
 }
 
 function RankGuideRow({
   styles,
-  tier,
-  minXp,
-  xpRange,
-  reward,
-  status,
+  row,
   isLast,
 }: {
   styles: ReturnType<typeof getStyles>
-  tier: RankTier
-  minXp: number
-  xpRange: string
-  reward: string
-  status: EntitlementStatus | null
+  row: RankRow
   isLast: boolean
 }) {
-  const statusHint = status ? entitlementStatusHint(status) : null
+  const statusHint = row.status ? entitlementStatusHint(row.status) : null
 
   return (
     <ThemedCard compact style={isLast ? styles.rankCardLast : styles.rankCard}>
       <View style={styles.rankRow}>
-        <Image source={RANK_BADGE_ASSET[tier]} style={styles.rankBadge} resizeMode="contain" />
-        <View style={styles.rankCopy}>
-          <Text style={styles.rankName}>{tier}</Text>
+        <Image
+          source={RANK_BADGE_ASSET[row.tier]}
+          style={styles.rankBadge}
+          resizeMode="contain"
+          pointerEvents="none"
+        />
+        <View style={styles.rankCopy} pointerEvents="box-none">
+          <Text style={styles.rankName}>{row.tier}</Text>
           <Text style={styles.rankThreshold}>
-            {minXp > 0 ? `Requires ${formatRankXpThreshold(minXp)}` : 'Starting rank'} · {xpRange}
+            {row.minXp > 0 ? `Requires ${formatRankXpThreshold(row.minXp)}` : 'Starting rank'} ·{' '}
+            {row.xpRange}
           </Text>
-          <Text style={styles.rankReward}>{reward}</Text>
+          <Text style={styles.rankReward}>{row.reward}</Text>
           {statusHint ? <Text style={styles.rankStatus}>{statusHint}</Text> : null}
         </View>
       </View>
@@ -260,19 +358,13 @@ function BadgeGuideRow({
 }: {
   styles: ReturnType<typeof getStyles>
   theme: { tintColor: string; mutedForegroundColor: string }
-  row: {
-    id: string
-    title: string
-    blurb: string
-    xpReward: number
-    earned: boolean
-  }
+  row: BadgeRow
   isLast: boolean
 }) {
   return (
     <ThemedCard compact style={isLast ? styles.badgeCardLast : styles.badgeCard}>
       <View style={styles.badgeRow}>
-        <View style={styles.badgeCopy}>
+        <View style={styles.badgeCopy} pointerEvents="box-none">
           <Text style={styles.badgeTitle}>{row.title}</Text>
           <Text style={styles.badgeBlurb}>{row.blurb}</Text>
           {row.xpReward > 0 ? (
@@ -280,7 +372,7 @@ function BadgeGuideRow({
           ) : null}
           {row.earned ? <Text style={styles.badgeEarned}>Earned this season</Text> : null}
         </View>
-        <View style={styles.badgeIconWrap}>
+        <View style={styles.badgeIconWrap} pointerEvents="none">
           <BadgeVectorIcon
             badgeId={row.id}
             size={44}
@@ -297,12 +389,17 @@ const getStyles = (theme: any) =>
   StyleSheet.create({
     screen: {
       flex: 1,
-      backgroundColor: theme.backgroundColor,
+      // Tint matches header so top overscroll does not flash black.
+      backgroundColor: theme.tintColor,
     },
     content: {
+      flexGrow: 1,
+      backgroundColor: theme.backgroundColor,
+      borderTopLeftRadius: RADIUS.xl,
+      borderTopRightRadius: RADIUS.xl,
+      paddingHorizontal: SPACING.containerPadding,
+      paddingTop: SPACING.sectionGap,
       paddingBottom: SPACING['3xl'],
-    },
-    surface: {
       gap: SPACING.sm,
     },
     sectionTitle: {
