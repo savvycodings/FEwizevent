@@ -16,6 +16,10 @@ web-build/
 *.p12
 *.key
 *.mobileprovision
+android/local.properties
+android/.gradle/
+android/app/build/
+android/build/
 
 # Metro
 .metro-health-check*
